@@ -12,9 +12,9 @@ extern "C" {
 #include "canopen.h"
 #include "vfd_driver.h"
 
-#define BASIC_TIMx                       TIM6
-#define BASIC_TIMx_HANDLE  				 htim6
-extern TIM_HandleTypeDef BASIC_TIMx_HANDLE;
+#define BASIC_TIM6                       TIM6
+#define BASIC_TIM6_HANDLE  				 htim6
+extern TIM_HandleTypeDef BASIC_TIM6_HANDLE;
 
 
 void bsp_TIM_Base_Start_IT(void);

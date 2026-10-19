@@ -6,6 +6,7 @@
 
 #define USART_UX         		USART1
 #define USART_UX_HANDLE  		huart1
+#define PRINT_BUF_LEN 128
 extern UART_HandleTypeDef 	USART_UX_HANDLE;       		/* HAL UART¾ä±ú */
 
 
@@ -15,7 +16,7 @@ void Usart_SendArray(const uint8_t *pData, uint16_t Size);
 void Usart_Send_U8(uint8_t data);
 void Usart_Send_U16(uint16_t data);
 void Usart_Send_U32(uint32_t data);
-
+void DebugPrint(const char *fmt, ...);//´®¿Ú´òÓ¡º¯Êý
 
 #endif /* __BSP_USART_H */
 

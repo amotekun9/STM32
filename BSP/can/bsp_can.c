@@ -91,29 +91,6 @@ bool BSP_CAN_ReadFrame(CanFrame_t *out_frame)
 }
 
 /**
- * @brief 主循环轮询：取出接收队列报文并交给 CiA402 协议栈
- * @note  每轮最多处理 16 帧，防止总线报文风暴时 while 循环
- *    出不完队列而饿死主循环/看门狗；剩余帧下一轮继续处理
- */
-void BSP_CAN_ProcessRx(CIA402_Node_t *node)
-{
-    if (node == NULL)
-    {
-        return;
-    }
-
-    for (uint8_t i = 0; i < 16U; i++)
-    {
-        CanFrame_t frame;
-        if (!BSP_CAN_ReadFrame(&frame))
-        {
-            break;
-        }
-        CANopen_RecvHandler(node, &frame);
-    }
-}
-
-/**
  * @brief 为单个从站节点配置硬件滤波器（可选，替代默认全通）
  * @note  bxCAN 掩码语义：Mask 位 = 1 必须匹配，= 0 不检查。
  *        32 位过滤器寄存器中 STID 位于高 16 位寄存器的 bit15:5，

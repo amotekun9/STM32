@@ -20,6 +20,8 @@ extern "C" {
 #include "modbus_rtu.h"
 #include "vfd_driver.h"
 #include "tpc_slave.h"
+#include "spindle_coder.h"
+#include "pinch_driver.h"
 
 void app_main(void);
 

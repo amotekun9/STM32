@@ -14,7 +14,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
+	
 /************************ 返回值定义 ************************/
 typedef enum {
     CO_OK = 0,           /* 操作成功 / 无错误 */
@@ -107,11 +107,12 @@ typedef struct {
  * @return true=发送成功, false=发送失败/邮箱满
  */
 extern bool CAN_SendFrame(const CanFrame_t *frame);
-
+extern bool BSP_CAN_ReadFrame(CanFrame_t *out_frame);
 /************************ 核心 API 函数声明 ************************/
 
 /* 节点初始化与心跳配置 */
-void CIA402_InitNode(CIA402_Node_t *node, uint8_t node_id);                 
+void CIA402_InitNode(CIA402_Node_t *node, uint8_t node_id);
+bool CIA402_InitAndRegisterNode(CIA402_Node_t *node, uint8_t node_id);
 CO_Err_t CIA402_SetHeartbeatTime(CIA402_Node_t *node, uint16_t heartbeat_ms); 
 
 /* NMT 网络管理与同步指令 */
@@ -139,6 +140,9 @@ CO_Err_t CIA402_PP_DebugMove(CIA402_Node_t *node, int32_t target_pos, uint32_t p
 CO_Err_t CIA402_SetTargetSpeed(CIA402_Node_t *node, int32_t target_vel);
 CO_Err_t CIA402_SetProfileAcceleration(CIA402_Node_t *node, uint32_t accel);
 CO_Err_t CIA402_SetProfileDeceleration(CIA402_Node_t *node, uint32_t decel);
+
+/*CANopen 协议层总线分发函数*/
+void CANopen_ProcessBus(void);
 
 /* 各通道 PDO 独立使能/禁用 API (Bit 31 控制) */
 CO_Err_t CIA402_EnableRxPDO1(CIA402_Node_t *node, bool enable);

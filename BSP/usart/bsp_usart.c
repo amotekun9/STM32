@@ -1,6 +1,9 @@
 #include "bsp_usart.h"
+#include <stdio.h>
+#include <stdarg.h>
 
 uint8_t usart_rx_byte;
+static char print_buf[PRINT_BUF_LEN];
 
 /******************************************************************************************/
 /* 加入以下代码, 支持printf函数, 而不需要选择use MicroLIB */
@@ -105,3 +108,11 @@ void Usart_SendArray(const uint8_t *pData, uint16_t Size)
     }
 }
 
+void DebugPrint(const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(print_buf, PRINT_BUF_LEN, fmt, args);
+    va_end(args);
+    Usart_SendString((uint8_t *)print_buf);
+}

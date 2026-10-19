@@ -163,18 +163,21 @@ static void MX_NVIC_Init(void)
   /* USB_LP_CAN1_RX0_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 0, 0);
   HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
-  /* TIM6_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(TIM6_IRQn, 1, 0);
-  HAL_NVIC_EnableIRQ(TIM6_IRQn);
   /* CAN1_SCE_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(CAN1_SCE_IRQn, 2, 0);
   HAL_NVIC_EnableIRQ(CAN1_SCE_IRQn);
   /* USART2_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(USART2_IRQn, 3, 0);
   HAL_NVIC_EnableIRQ(USART2_IRQn);
+  /* USART3_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(USART3_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(USART3_IRQn);
   /* DMA1_Channel7_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 4, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
+  /* TIM6_IRQn interrupt configuration */
+  HAL_NVIC_SetPriority(TIM6_IRQn, 6, 0);
+  HAL_NVIC_EnableIRQ(TIM6_IRQn);
 }
 
 /* USER CODE BEGIN 4 */

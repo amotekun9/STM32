@@ -48,13 +48,6 @@ bool CAN_SendFrame(const CanFrame_t *frame);
 bool BSP_CAN_ReadFrame(CanFrame_t *out_frame);
 
 /**
- * @brief  主循环轮询：取出接收队列中的报文并交给 CiA402 协议栈处理
- * @param  node: 目标 CiA402 节点指针
- * @note   每轮最多处理 16 帧，防止报文风暴饿死主循环；剩余帧下一轮继续
- */
-void BSP_CAN_ProcessRx(CIA402_Node_t *node);
-
-/**
  * @brief  为单个从站节点配置硬件滤波器（可选，替代默认全通）
  * @param  node_id:    从站节点 ID（1~127）
  * @param  start_bank: 起始滤波器组号（STM32F1 共 14 组，每节点占用 5 组）

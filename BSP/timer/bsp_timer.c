@@ -1,15 +1,16 @@
 #include "bsp_timer.h"
+#include "spindle_coder.h"
 
 void bsp_TIM_Base_Start_IT(void)
 {
-    HAL_TIM_Base_Start_IT(&BASIC_TIMx_HANDLE);
+    HAL_TIM_Base_Start_IT(&BASIC_TIM6_HANDLE);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
-    if (htim->Instance == BASIC_TIMx)
+    if (htim->Instance == BASIC_TIM6)
     {
-		
+		Spl_Encoder_Timer_ISR();
     }
 }
 
