@@ -35,7 +35,7 @@ void app_main(void)
         modbus_slave_task();  //单片机modbus从机任务，必须不断轮询，处理主机请求;
 
         /* 处理电子夹纱器请求 */
-        Pinch_Motor_task(); //夹持电机任务，必须不断轮询，处理主机请求;
+        Pinch_Motor_task(); //夹持电机任务，必须不断轮询，处理主机请求; 
         
 		CANopen_ProcessBus();
 		
