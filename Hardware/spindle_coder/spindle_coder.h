@@ -17,7 +17,7 @@ extern "C" {
 #include "stm32f1xx_hal.h"
 #include "spindle_coder.h"
 	
-#define ENCODER_LINE     600U   //增量式光电编码器线数
+#define ENCODER_LINE     360U   //增量式光电编码器线数
 #define ENCODER_PUL_PER_ROUND  (ENCODER_LINE * 4U)  //4倍频
 
 
