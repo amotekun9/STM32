@@ -254,10 +254,8 @@ void CANOPEN_RxProcess(CAN_Step_Node_t *node, const StepCanFrame_t *frame)
  */
 void Pinch_Motor_task(void)
 {
-    // DebugPrint("encoder_rpm: %d\r\n",modbus_holding_reg[3]);
-    modbus_holding_reg[2]=encoder_angle;
-    // modbus_holding_reg[2]= encoder_cnt;
-    target_speed_N = modbus_holding_reg[3];
+
+    target_speed_N = encoder_rpm * 10; //将编码器转速转换为目标速度，单位为脉冲/秒
     target_speed_N = 10*encoder_rpm ;
 
     if(target_speed_N != target_speed_O)

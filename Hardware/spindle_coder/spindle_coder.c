@@ -10,6 +10,7 @@
 /* ====================头文件包含区==================== */
 #include "spindle_coder.h"
 #include "math.h"
+#include "tpc_slave.h"
 /****************宏定义区***********************/
 
 
@@ -128,10 +129,12 @@ void Spl_Encoder_CalcSpeedAndAngle(uint32_t sample_ms)
         encoder_angle += 360.0f;
     }
 
-    g_upload_data.encoder_angle_up = (uint16_t)encoder_angle; //上报给触摸屏
+   g_upload_data.encoder_angle_up = (uint16_t)encoder_angle; //上报给触摸屏
     /* M法计算转速，单位rpm */
     float T = sample_ms / 1000.0f;
     encoder_rpm = ( (float)delta_p / (ENCODER_PUL_PER_ROUND * T) ) * 60.0f;
+
+    g_upload_data.encoder_rpm_up = encoder_rpm; //上报给触摸屏
 
     encoder_cnt_last = cnt_now;
 }

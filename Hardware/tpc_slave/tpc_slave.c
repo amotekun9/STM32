@@ -9,6 +9,7 @@
 #include "tpc_slave.h"
 #include "bsp_rs485.h"
 #include <string.h>
+#include "app_main.h"
 
 // Modbus RTU 3.5字符静默超时(ms)，9600=5ms，19200=3ms
 #define MODBUS_FRAME_INTERVAL_MS    1
@@ -200,20 +201,21 @@ void modbus_slave_init(void)
 void ModbusHolding_RefreshUpload(void)
 {
     // ========== 1. 本地变量 → Modbus寄存器（上报 + 参数回显） ==========
-    modbus_holding_reg[2] = g_upload_data.encoder_angle_up;     // reg2：主轴编码器转速【采集上报】
-    modbus_holding_reg[3] = g_upload_data.gear_ratio_up;         // reg3：绞边减速比【参数回显，触摸屏可写】
-    modbus_holding_reg[4] = g_upload_data.left_edge_pos_up;      // reg4：左绞边位置【采集上报】
-    modbus_holding_reg[5] = g_upload_data.right_edge_pos_up;     // reg5：右绞边位置【采集上报】
-    modbus_holding_reg[6] = g_upload_data.cut_star_angle_up;       // reg6：剪刀剪切间隔【参数回显，触摸屏可写】
-	
-		modbus_holding_reg[8] = g_upload_data.cut_return_angle_up;       // reg6：剪刀剪切间隔【参数回显，触摸屏可写】
-    // ========== 2. 读取触摸屏下发的参数，更新本地变量 ==========
-    g_upload_data.gear_ratio_up    = modbus_holding_reg[3];
-    g_upload_data.cut_star_angle_up  = modbus_holding_reg[6];
-		g_upload_data.cut_return_angle_up  = modbus_holding_reg[8];
+    modbus_holding_reg[0] = g_upload_data.encoder_angle_up;     // reg2：主轴编码器转速【采集上报】
+    modbus_holding_reg[1] = g_upload_data.gear_ratio_up;         // reg4：绞边减速比【参数回显，触摸屏可写】
+    modbus_holding_reg[2] = g_upload_data.left_edge_pos_up;      // reg5：左绞边位置【采集上报】
+    modbus_holding_reg[3] = g_upload_data.right_edge_pos_up;     // reg6：右绞边位置【采集上报】
+    modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;       // reg7  ：剪刀剪切间隔【参数回显，触摸屏可写】
+	modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;       // reg9：剪刀剪切间隔【参数回显，触摸屏可写】
+    modbus_holding_reg[7] = g_upload_data.encoder_rpm_up;      // reg8：主轴当前速度【采集上报】
+
+    // // ========== 2. 读取触摸屏下发的参数，更新本地变量 ==========
+    g_upload_data.gear_ratio_up    = modbus_holding_reg[2];
+    g_upload_data.cut_star_angle_up  = modbus_holding_reg[4];
+	g_upload_data.cut_return_angle_up  = modbus_holding_reg[5];
 
     // ========== 3. 读取控制命令寄存器（仅读，不回写） ==========
-    g_ctrl_cmd_reg = modbus_holding_reg[7];
+    g_ctrl_cmd_reg = modbus_holding_reg[6];
 }
 
 /**

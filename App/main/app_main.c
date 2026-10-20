@@ -21,6 +21,7 @@ void app_main(void)
     BSP_CAN_Start();
 	delay_ms(5);
     CANOPEN_Motor_Init(&g_step_node, 127);
+
 	
     while (1)
     {
@@ -38,6 +39,7 @@ void app_main(void)
 
         /* 处理电子夹纱器请求 */
         Pinch_Motor_task(); //夹持电机任务，必须不断轮询，处理主机请求; 
+        
         
 		CANopen_ProcessBus();
 		
