@@ -9,7 +9,7 @@
 
 /* ====================头文件包含区==================== */
 #include "spindle_coder.h"
-
+#include "math.h"
 /****************宏定义区***********************/
 
 
@@ -26,6 +26,7 @@ float encoder_rpm = 0.0f;
 static int32_t encoder_cnt_last = 0;//上一次采样的脉冲值
 
 uint8_t encoder_sample_flag = 0;
+extern UploadData_t g_upload_data;
 /***********************************************/
 
 
@@ -108,7 +109,7 @@ void Spl_Encoder_ResetCount(void)
 
 
 /******************************************
- * @brief  计算编码器角度与转速
+ * @brief  计算编码器角度与转速(多圈)
  * @param[in]  sample_ms 测速采样周期，单位ms
  * @return  无
  * @note    M法测速，4倍频正交采集；基于当前脉冲值计算角度，脉冲差值计算转速
@@ -116,17 +117,23 @@ void Spl_Encoder_ResetCount(void)
  ******************************************/
 void Spl_Encoder_CalcSpeedAndAngle(uint32_t sample_ms)
 {
-    int32_t cnt_now = Spl_Encoder_GetCount();       /**< 读取当前编码器脉冲计数值 */
-    int32_t delta_p = cnt_now - encoder_cnt_last;  /**< 计算本次采样间隔内脉冲变化量 */
+    int32_t cnt_now = Spl_Encoder_GetCount();
+    int32_t delta_p = cnt_now - encoder_cnt_last;
 
-    /* 根据总脉冲数换算角度 */
-    encoder_angle = cnt_now * (360.0f / ENCODER_PUL_PER_ROUND);
+    float angle_temp = cnt_now * (360.0f / ENCODER_PUL_PER_ROUND);
+    // 直接做取模，encoder_angle变成【单圈角度 0~360°】
+    encoder_angle = fmod(angle_temp, 360.0f);
+    if(encoder_angle < 0.0f)
+    {
+        encoder_angle += 360.0f;
+    }
 
+    g_upload_data.encoder_angle_up = (uint16_t)encoder_angle; //上报给触摸屏
     /* M法计算转速，单位rpm */
-    float T = sample_ms / 1000.0f;                 /**< 采样周期转换为秒 */
+    float T = sample_ms / 1000.0f;
     encoder_rpm = ( (float)delta_p / (ENCODER_PUL_PER_ROUND * T) ) * 60.0f;
 
-    encoder_cnt_last = cnt_now;                    /**< 更新上一时刻脉冲值，供下一轮采样 */
+    encoder_cnt_last = cnt_now;
 }
 
 /**************************************

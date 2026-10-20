@@ -3,7 +3,7 @@
 /* 全局 CiA402 节点实例（方便在 Keil Watch 窗口中观察实时状态） */
 CIA402_Node_t g_servo_node_1;
 CIA402_Node_t g_servo_node_2;
-CAN_Step_Node_t g_step_node;
+extern CAN_Step_Node_t g_step_node;
 
 
 void app_main(void)
@@ -33,6 +33,8 @@ void app_main(void)
 
         /* 处理 HMI 侧请求 */
         modbus_slave_task();  //单片机modbus从机任务，必须不断轮询，处理主机请求;
+        ModbusHolding_RefreshUpload();// 业务数据写入保持寄存器
+        Modbus_CmdParse();            // 解析触摸屏下发的控制bit指令
 
         /* 处理电子夹纱器请求 */
         Pinch_Motor_task(); //夹持电机任务，必须不断轮询，处理主机请求; 
