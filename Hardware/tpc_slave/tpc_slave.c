@@ -20,7 +20,7 @@ uint16_t modbus_holding_reg[MODBUS_HOLD_REG_COUNT] = {0};
 // 全局上报结构体变量
 UploadData_t g_upload_data = {0};
 // 全局控制指令寄存器
-uint16_t g_ctrl_cmd_reg = 0;
+extern uint16_t g_ctrl_cmd_reg = 0;
 CAN_Step_Node_t g_step_node;
 
 // Modbus CRC16 查表
@@ -196,34 +196,33 @@ void modbus_slave_init(void)
 
 /**
  * @brief  Modbus上报刷新函数：把结构体上报变量拷贝到保持寄存器
- * @note   从 modbus_holding_reg[2] 开始使用，[0][1]保留不用
+ * @note   
  */
 void ModbusHolding_RefreshUpload(void)
 {
-    // ========== 1. 本地变量 → Modbus寄存器（上报 + 参数回显） ==========
-    modbus_holding_reg[0] = g_upload_data.encoder_angle_up;     // reg2：主轴编码器转速【采集上报】
-    modbus_holding_reg[1] = g_upload_data.gear_ratio_up;         // reg4：绞边减速比【参数回显，触摸屏可写】
-    modbus_holding_reg[2] = g_upload_data.left_edge_pos_up;      // reg5：左绞边位置【采集上报】
-    modbus_holding_reg[3] = g_upload_data.right_edge_pos_up;     // reg6：右绞边位置【采集上报】
-    modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;       // reg7  ：剪刀剪切间隔【参数回显，触摸屏可写】
-	modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;       // reg9：剪刀剪切间隔【参数回显，触摸屏可写】
-    modbus_holding_reg[7] = g_upload_data.encoder_rpm_up;      // reg8：主轴当前速度【采集上报】
+    // ========== 第一步：优先读取触摸屏下发的参数、控制命令（最重要！先读后写，防止屏下发的值被覆盖） ==========
+    g_upload_data.gear_ratio_up      = modbus_holding_reg[1];       // 绞边减速比，触摸屏可修改参数
+    g_upload_data.cut_star_angle_up   = modbus_holding_reg[4];      // 剪刀起始剪切角度，触摸屏可修改参数
+    g_upload_data.cut_return_angle_up= modbus_holding_reg[5];       // 剪刀回位角度，触摸屏可修改参数
+    g_ctrl_cmd_reg = modbus_holding_reg[6];                         // 控制命令寄存器，仅读取，单片机不回写
 
-    // // ========== 2. 读取触摸屏下发的参数，更新本地变量 ==========
-    g_upload_data.gear_ratio_up    = modbus_holding_reg[2];
-    g_upload_data.cut_star_angle_up  = modbus_holding_reg[4];
-	g_upload_data.cut_return_angle_up  = modbus_holding_reg[5];
-
-    // ========== 3. 读取控制命令寄存器（仅读，不回写） ==========
-    g_ctrl_cmd_reg = modbus_holding_reg[6];
+    // ========== 第二步：本地采集变量/参数 刷新到Modbus保持寄存器，用于触摸屏读取上报和参数回显 ==========
+    modbus_holding_reg[0] = g_upload_data.encoder_angle_up;         // 主轴编码器角度，采集上报，只读
+    modbus_holding_reg[1] = g_upload_data.gear_ratio_up;             // 绞边减速比，参数回显
+    modbus_holding_reg[2] = g_upload_data.left_edge_pos_up;          // 左绞边位置，采集上报，只读
+    modbus_holding_reg[3] = g_upload_data.right_edge_pos_up;        // 右绞边位置，采集上报，只读
+    modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;        // 剪刀起始剪切角度，参数回显
+    modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;      // 剪刀回位角度，参数回显
+    modbus_holding_reg[7] = g_upload_data.encoder_rpm_up;           // 主轴实时转速，采集上报，只读 
 }
+
 
 /**
  * @brief  Modbus指令解析，按钮动作处理 + 握手清零
  * @note   主循环while(1)里面调用，执行完动作后，清除对应bit，防止重复触发
  */
 void Modbus_CmdParse(void)
-{
+{   
     uint16_t cmd = g_ctrl_cmd_reg;
     if(cmd == 0)
     {
@@ -231,57 +230,61 @@ void Modbus_CmdParse(void)
     }
 
     // ========== 左侧电子绞边 ==========
-    if(cmd & CTRL_BIT_LEFT_EDGE_JOG_FWD)
+    if(cmd == CTRL_BIT_LEFT_EDGE_JOG_FWD)
     {
         // LeftEdge_JogForward();
     }
-    if(cmd & CTRL_BIT_LEFT_EDGE_JOG_REV)
+    if(cmd == CTRL_BIT_LEFT_EDGE_JOG_REV)
     {
         // LeftEdge_JogReverse();
     }
-    if(cmd & CTRL_BIT_LEFT_EDGE_HOME)//归零
+    if(cmd == CTRL_BIT_LEFT_EDGE_HOME)//归零
     {
         // LeftEdge_Home();
     }
 
     // ========== 右侧电子绞边 ==========
-    if(cmd & CTRL_BIT_RIGHT_EDGE_JOG_FWD)
+    if(cmd == CTRL_BIT_RIGHT_EDGE_JOG_FWD)
     {
         // RightEdge_JogForward();
     }
-    if(cmd & CTRL_BIT_RIGHT_EDGE_JOG_REV)
+    if(cmd == CTRL_BIT_RIGHT_EDGE_JOG_REV)
     {
         // RightEdge_JogReverse();
     }
-    if(cmd & CTRL_BIT_RIGHT_EDGE_HOME) //归零
+    if(cmd == CTRL_BIT_RIGHT_EDGE_HOME) //归零
     {
         // RightEdge_Home();
     }
 
     // ========== 电子剪刀 ==========
-    if(cmd & CTRL_BIT_CUT_ACTION)  //手动剪切
+    if(cmd == CTRL_BIT_CUT_ACTION)  //手动剪切
     {
         // Cut_DoAction();
     }
-    if(cmd & CTRL_BIT_CUT_HOME) //归零
+    if(cmd == CTRL_BIT_CUT_HOME) //归零
     {
         // Cut_Home();
     }
 
     // ========== 电子夹棍 ==========
-    if(cmd & CTRL_BIT_CLAMP_JOG_FWD)
-    {
+    if(cmd == CTRL_BIT_CLAMP_JOG_FWD)
+    {   
+//        DebugPrint("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
         CANOPEN_Motor_SetVelocity(&g_step_node, 20);
+        delay_ms(5); //延时5ms，确保速度设置生效
         CANOPEN_Motor_Enable(&g_step_node);
     }
-    if(cmd & CTRL_BIT_CLAMP_JOG_REV)
-    {
+    if(cmd == CTRL_BIT_CLAMP_JOG_REV)
+    {   
+//        DebugPrint("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
         CANOPEN_Motor_SetVelocity(&g_step_node, -20);
+        delay_ms(5); //延时5ms，确保速度设置生效
         CANOPEN_Motor_Enable(&g_step_node);
     }
 
     // =====【握手关键】处理完成，清空控制寄存器=====
-    modbus_holding_reg[7] = 0;
+    modbus_holding_reg[6] = 0;
     g_ctrl_cmd_reg = 0;
 }
 

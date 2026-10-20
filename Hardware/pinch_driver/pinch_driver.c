@@ -79,7 +79,7 @@ void CANOPEN_Motor_Init(CAN_Step_Node_t *node, uint8_t node_id)
     node->sdo_abort_code = 0;
 
     // ===== PV速度模式初始化代码块 =====
-    CANOPEN_Motor_SetTorqueMaxCurrent(node, 3000);//配置电流1200mA
+    CANOPEN_Motor_SetTorqueMaxCurrent(node, 1000);//配置电流1200mA
 	delay_ms(5);
     // CANOPEN_SendFrame(node, SDO_CMD_WRITE_1B, OD_OP_MODE, 0x00, STEP_OP_PROFILE_VEL);
     CANOPEN_Motor_SetVelocity(node, 0);
@@ -254,20 +254,24 @@ void CANOPEN_RxProcess(CAN_Step_Node_t *node, const StepCanFrame_t *frame)
  */
 void Pinch_Motor_task(void)
 {
+    target_speed_N = (int32_t)(encoder_rpm * 10);
 
-    target_speed_N = encoder_rpm * 10; //将编码器转速转换为目标速度，单位为脉冲/秒
-    target_speed_N = 10*encoder_rpm ;
+    if(target_speed_N > 200)
+    {
+        target_speed_N = 200;
+    }
+    if(target_speed_N < -200)
+    {
+        target_speed_N = -200;
+    }
 
     if(target_speed_N != target_speed_O)
     {
         target_speed_O = target_speed_N;
-        if(target_speed_N > 200)
-        {
-            target_speed_N = 200;
-        }
-//         DebugPrint("target_speed_N: %d, target_speed_O: %d\r\n", target_speed_N, target_speed_O);
+       // DebugPrint("target_speed_N: %d, target_speed_O: %d\r\n", target_speed_N, target_speed_O);
         CANOPEN_Motor_SetVelocity(&g_step_node, target_speed_N);
-		delay_ms(5);
+        delay_ms(5);
         CANOPEN_Motor_Enable(&g_step_node);
     }
 }
+
