@@ -33,19 +33,19 @@ typedef struct
 } UploadData_t;
 
 /************************* 控制指令bit定义（触摸屏 → MCU）*************************/
-#define CTRL_BIT_LEFT_EDGE_JOG_FWD  (1U << 1)   // bit0：左侧绞边慢动正转
-#define CTRL_BIT_LEFT_EDGE_JOG_REV  (1U << 2)   // bit1：左侧绞边慢动反转
-#define CTRL_BIT_LEFT_EDGE_HOME     (1U << 3)   // bit2：左侧绞边归位
+#define CTRL_BIT_LEFT_EDGE_JOG_FWD  1   // bit0：左侧绞边慢动正转
+#define CTRL_BIT_LEFT_EDGE_JOG_REV  2   // bit1：左侧绞边慢动反转
+#define CTRL_BIT_LEFT_EDGE_HOME     3   // bit2：左侧绞边归位
 
-#define CTRL_BIT_RIGHT_EDGE_JOG_FWD (1U << 4)   // bit3：右侧绞边慢动正转
-#define CTRL_BIT_RIGHT_EDGE_JOG_REV (1U << 5)   // bit4：右侧绞边慢动反转
-#define CTRL_BIT_RIGHT_EDGE_HOME    (1U << 6)   // bit5：右侧绞边归位
+#define CTRL_BIT_RIGHT_EDGE_JOG_FWD 4   // bit3：右侧绞边慢动正转
+#define CTRL_BIT_RIGHT_EDGE_JOG_REV 5  // bit4：右侧绞边慢动反转
+#define CTRL_BIT_RIGHT_EDGE_HOME    6   // bit5：右侧绞边归位
 
-#define CTRL_BIT_CUT_ACTION         (1U << 7)   // bit6：电子剪刀剪切
-#define CTRL_BIT_CUT_HOME           (1U << 8)   // bit7：电子剪刀归位
+#define CTRL_BIT_CUT_ACTION         7   // bit6：电子剪刀剪切
+#define CTRL_BIT_CUT_HOME           8   // bit7：电子剪刀归位
 
-#define CTRL_BIT_CLAMP_JOG_FWD      (1U << 9)   // bit8：电子夹棍慢动正转
-#define CTRL_BIT_CLAMP_JOG_REV      (1U << 10)  // bit9：电子夹棍慢动反转
+#define CTRL_BIT_CLAMP_JOG_FWD      9   // bit8：电子夹棍慢动正转
+#define CTRL_BIT_CLAMP_JOG_REV      10  // bit9：电子夹棍慢动反转
 
 
 #define MODBUS_SLAVE_ADDR       1

@@ -11,6 +11,7 @@
 #include "spindle_coder.h"
 #include "math.h"
 #include "tpc_slave.h"
+#include "app_main.h"
 /****************宏定义区***********************/
 
 
@@ -21,6 +22,8 @@ uint8_t encoder_A_last = 0;
 uint8_t encoder_B_last = 0;
 int32_t encoder_cnt = 0;
 uint8_t encoder_z_flag = 0;
+
+int32_t encoder_zero_offset = 0;//Z相零点偏移量
 
 float encoder_angle = 0.0f;
 float encoder_rpm = 0.0f;
@@ -84,15 +87,14 @@ void Spl_Encoder_Init(void)
  * @warning 短时关闭全局中断，关中断区间仅执行简单变量拷贝，无耗时操作
  *********************************************/
 int32_t Spl_Encoder_GetCount(void)
-{		
-    int32_t temp;
-
-    __disable_irq();  /**< 关闭全局中断，原子保护读取操作 */
-    temp = encoder_cnt; /**< 拷贝脉冲计数值到临时变量 */
-    __enable_irq();   /**< 恢复全局中断 */
-
-    return temp;
+{
+    int32_t val;
+    __disable_irq();
+    val = encoder_cnt;
+    __enable_irq();
+    return val;
 }
+
 
 /*************************************
  * @brief  清零编码器脉冲计数值
@@ -118,26 +120,27 @@ void Spl_Encoder_ResetCount(void)
  ******************************************/
 void Spl_Encoder_CalcSpeedAndAngle(uint32_t sample_ms)
 {
-    int32_t cnt_now = Spl_Encoder_GetCount();
-    int32_t delta_p = cnt_now - encoder_cnt_last;
+    int32_t cnt_raw = Spl_Encoder_GetCount(); //原始总脉冲
+    int32_t cnt_now = cnt_raw - encoder_zero_offset; //减去零点偏移，作为相对单圈脉冲
+
+    int32_t delta_p = cnt_raw - encoder_cnt_last; //【重点！delta_p使用原始总脉冲，不受Z相偏移影响！】
+    encoder_cnt_last = cnt_raw; //保存原始总脉冲，用于下一次delta计算
 
     float angle_temp = cnt_now * (360.0f / ENCODER_PUL_PER_ROUND);
-    // 直接做取模，encoder_angle变成【单圈角度 0~360°】
+    // 单圈角度0~360
     encoder_angle = fmod(angle_temp, 360.0f);
     if(encoder_angle < 0.0f)
     {
         encoder_angle += 360.0f;
     }
+    g_upload_data.encoder_angle_up = (uint16_t)encoder_angle; 
 
-   g_upload_data.encoder_angle_up = (uint16_t)encoder_angle; //上报给触摸屏
     /* M法计算转速，单位rpm */
     float T = sample_ms / 1000.0f;
     encoder_rpm = ( (float)delta_p / (ENCODER_PUL_PER_ROUND * T) ) * 60.0f;
-
-    g_upload_data.encoder_rpm_up = encoder_rpm; //上报给触摸屏
-
-    encoder_cnt_last = cnt_now;
+    g_upload_data.encoder_rpm_up = fabsf(encoder_rpm);
 }
+
 
 /**************************************
  * @brief  GPIO外部中断回调函数
@@ -187,8 +190,8 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
     }
     else if(GPIO_Pin == GPIO_PIN_12)
     {
-        /* Z相索引脉冲，每圈触发一次，作为机械原点，将脉冲计数清零 */
-        encoder_cnt = 0;
+        //Z相到来，设置零点偏移，不清原始脉冲计数器！！！
+        encoder_zero_offset = encoder_cnt;
     }
 }
 
@@ -196,19 +199,30 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
  * @brief  编码器定时采样处理函数
  * @param[in]  None
  * @return  无
- * @note    由TIM7每20ms调用一次;执行转速计算并做一阶低通滤波
+ * @note    由TIM6每20ms调用一次;执行转速计算并做一阶低通滤波
  * @warning 运行在中断上下文,禁止调用耗时函数、阻塞接口
  *************************************/
 void Spl_Encoder_Timer_ISR(void)
 {
-    static float rpm_filter = 0.0f; /**< 转速滤波缓存值，static保留上次结果 */
-    const float filter_k = 0.1f;    /**< 一阶低通滤波系数 */
+    static float rpm_filter = 0.0f;
+    const float filter_k = 0.1f;
+    Spl_Encoder_CalcSpeedAndAngle(100);  // 你的采集周期是100ms，同步改掉20
 
-    Spl_Encoder_CalcSpeedAndAngle(20); /**< 执行角度、转速计算，采样周期20ms */
-    rpm_filter = rpm_filter * (1.0f - filter_k) + encoder_rpm * filter_k; /**< 一阶低通滤波运算 */
-    encoder_rpm = rpm_filter; /**< 滤波后的转速覆盖原始转速 */
-		
+    // 只限制最大绝对值
+    if(encoder_rpm > 3000)
+    {
+        encoder_rpm = rpm_filter;
+    }
+    if(encoder_rpm < -3000)
+    {
+        encoder_rpm = rpm_filter;
+    }
+
+    rpm_filter = rpm_filter * (1.0f - filter_k) + encoder_rpm * filter_k;
+    encoder_rpm = rpm_filter;
 }
+
+
 
 
 
