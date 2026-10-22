@@ -9,6 +9,7 @@
  
 #ifndef _SPINDLE_CODER_H
 #define _SPINDLE_CODER_H
+#include "scissor_driver.h"
 
 #ifdef __cplusplus
 extern "C" {

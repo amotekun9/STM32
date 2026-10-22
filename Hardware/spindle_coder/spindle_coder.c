@@ -207,7 +207,7 @@ void Spl_Encoder_Timer_ISR(void)
     static float rpm_filter = 0.0f;
     const float filter_k = 0.1f;
     Spl_Encoder_CalcSpeedAndAngle(100);  // 你的采集周期是100ms，同步改掉20
-
+	scissor_window_check(2000,60);
     // 只限制最大绝对值
     if(encoder_rpm > 3000)
     {

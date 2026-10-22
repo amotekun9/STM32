@@ -22,7 +22,8 @@ extern "C" {
 #include "tpc_slave.h"
 #include "spindle_coder.h"
 #include "pinch_driver.h"
-
+#include "scissor_driver.h"
+	
 void app_main(void);
 
 

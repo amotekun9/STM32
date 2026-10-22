@@ -21,8 +21,8 @@ void app_main(void)
     BSP_CAN_Start();
 	delay_ms(5);
     CANOPEN_Motor_Init(&g_step_node, 127);
+    
 
-	
     while (1)
     {
         /* 双路高频轮询看门狗与数据同步 */
@@ -43,6 +43,7 @@ void app_main(void)
         
 		CANopen_ProcessBus();
 		
+		scissor_poll();
     }
 }
 
