@@ -216,7 +216,6 @@ void ModbusHolding_RefreshUpload(void)
     modbus_holding_reg[7] = g_upload_data.encoder_rpm_up;           // 主轴实时转速，采集上报，只读 
 }
 
-
 /**
  * @brief  Modbus指令解析，按钮动作处理 + 握手清零
  * @note   主循环while(1)里面调用，执行完动作后，清除对应bit，防止重复触发
@@ -258,13 +257,13 @@ void Modbus_CmdParse(void)
     }
 
     // ========== 电子剪刀 ==========
-    if(cmd == CTRL_BIT_CUT_ACTION)  //手动剪切
+    if(cmd == CTRL_BIT_CUT_ACTION)  //手动剪切close
     {
-        // Cut_DoAction();
+        scissor_close_trig(2000);
     }
-    if(cmd == CTRL_BIT_CUT_HOME) //归零
+    if(cmd == CTRL_BIT_CUT_HOME) //归位open
     {
-        // Cut_Home();
+        scissor_open_trig(2000);
     }
 
     // ========== 电子夹棍 ==========
@@ -286,10 +285,4 @@ void Modbus_CmdParse(void)
     modbus_holding_reg[6] = 0;
     g_ctrl_cmd_reg = 0;
 }
-
-
-
-
-
-
 
