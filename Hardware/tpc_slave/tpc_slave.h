@@ -4,7 +4,7 @@
  * @author  MO wenzhi
  * @version V1.0
  * @date    2026.10.09
- * @note    
+ * @note    modbus从机协议
  ***********************************************/
  
 #ifndef __TPC_SLAVE_H
