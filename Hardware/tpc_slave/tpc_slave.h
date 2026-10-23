@@ -4,7 +4,7 @@
  * @author  MO wenzhi
  * @version V1.0
  * @date    2026.10.09
- * @note      ≈‰∞Ÿƒ…BN5058œµ¡–±‡¬Î,PC10:A PC11:B
+ * @note    
  ***********************************************/
  
 #ifndef __TPC_SLAVE_H
