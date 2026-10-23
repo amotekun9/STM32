@@ -69,4 +69,5 @@ void modbus_slave_init(void);
 #ifdef __cplusplus
 }
 #endif
+
 #endif

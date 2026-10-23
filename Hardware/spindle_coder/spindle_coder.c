@@ -9,13 +9,15 @@
 
 /* ====================头文件包含区==================== */
 #include "spindle_coder.h"
-#include "math.h"
-#include "tpc_slave.h"
-#include "app_main.h"
+
+extern UploadData_t g_upload_data;
+
 /****************宏定义区***********************/
-
-
-/**********************************************/
+#define ANGLE_FULL_ROUND     360        // 一圈360度
+#define RPM_CONST_60         60
+#define RPM_CONST_1000       1000
+#define FILTER_SCALE         10
+#define ANGLE_FIX_SCALE      100        // 角度定点放大系数
 
 /****************全局变量区***********************/
 uint8_t encoder_A_last = 0;
@@ -25,60 +27,13 @@ uint8_t encoder_z_flag = 0;
 
 int32_t encoder_zero_offset = 0;//Z相零点偏移量
 
-float encoder_angle = 0.0f;
-float encoder_rpm = 0.0f;
+int16_t encoder_angle = 0;
+int16_t encoder_rpm = 0;
 static int32_t encoder_cnt_last = 0;//上一次采样的脉冲值
 
 uint8_t encoder_sample_flag = 0;
-extern UploadData_t g_upload_data;
-/***********************************************/
-
-
-/****************静态函数声明***********************/
-
-
-/**********************************************/
-
 
 /***************函数定义区***********************/
-
-/**************************************************
- * @brief  编码器硬件初始化
- * @param[in]  None
- * @return  无
- * @note   PC10:A相、PC11:B相配置为双边沿外部中断，开启内部上拉；
- *         PC12:Z相配置为下降沿外部中断，开启内部上拉；
- *         初始化读取AB相初始电平，用于正交判向。
- * @warning 调用前需保证系统时钟已初始化。
- *************************************************/
-void Spl_Encoder_Init(void)
-{
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-    __HAL_RCC_GPIOC_CLK_ENABLE(); /**< 使能GPIOC外设时钟 */
-
-    /* PC10 A相，双边沿外部中断，开启内部上拉 */
-    GPIO_InitStruct.Pin = GPIO_PIN_10;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-    /* PC11 B相，双边沿外部中断，开启内部上拉 */
-    GPIO_InitStruct.Pin = GPIO_PIN_11;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING_FALLING;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-    /* PC12 Z相，下降沿外部中断，开启内部上拉 */
-    GPIO_InitStruct.Pin = GPIO_PIN_12;
-    GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
-    GPIO_InitStruct.Pull = GPIO_PULLUP;
-    HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-    /* 读取AB相初始电平，保存为历史状态，用于正交4倍频判向 */
-    encoder_A_last = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_10);
-    encoder_B_last = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_11);
-}
-
 /*********************************************
  * @brief  获取编码器当前脉冲计数值
  * @param[in]  None
@@ -120,27 +75,39 @@ void Spl_Encoder_ResetCount(void)
  ******************************************/
 void Spl_Encoder_CalcSpeedAndAngle(uint32_t sample_ms)
 {
-    int32_t cnt_raw = Spl_Encoder_GetCount(); //原始总脉冲
-    int32_t cnt_now = cnt_raw - encoder_zero_offset; //减去零点偏移，作为相对单圈脉冲
+    int32_t cnt_raw     = 0;
+    int32_t cnt_now     = 0;
+    int32_t delta_p     = 0;
+    int32_t angle_temp  = 0;
+    int32_t angle_all   = 0;
+    int32_t rpm_tmp     = 0;
+    int16_t rpm         = 0;
+    uint16_t rpm_abs    = 0;
 
-    int32_t delta_p = cnt_raw - encoder_cnt_last; //【重点！delta_p使用原始总脉冲，不受Z相偏移影响！】
-    encoder_cnt_last = cnt_raw; //保存原始总脉冲，用于下一次delta计算
+    cnt_raw = Spl_Encoder_GetCount();   // 读取编码器当前脉冲计数值
+    cnt_now = cnt_raw;
+    delta_p = cnt_raw - encoder_cnt_last;    // 计算采样间隔内脉冲变化量
+    encoder_cnt_last = cnt_raw;              // 保存当前脉冲，供下一次差值计算
 
-    float angle_temp = cnt_now * (360.0f / ENCODER_PUL_PER_ROUND);
-    // 单圈角度0~360
-    encoder_angle = fmod(angle_temp, 360.0f);
-    if(encoder_angle < 0.0f)
+    // ========== 角度计算 纯整型 0~359 ==========
+    angle_temp = cnt_now * 360;                          // 脉冲换算总角度
+    angle_all = angle_temp / ENCODER_PUL_PER_ROUND;      // 得到累计总角度
+    encoder_angle = (int16_t)(angle_all % 360);          // 取模得到单圈角度
+    if (encoder_angle < 0)
     {
-        encoder_angle += 360.0f;
+        encoder_angle += 360;                            // 负角度补偿，保证0~359
     }
-    g_upload_data.encoder_angle_up = (uint16_t)encoder_angle; 
+    g_upload_data.encoder_angle_up = (uint16_t)encoder_angle;  // 角度存入上报结构体
 
-    /* M法计算转速，单位rpm */
-    float T = sample_ms / 1000.0f;
-    encoder_rpm = ( (float)delta_p / (ENCODER_PUL_PER_ROUND * T) ) * 60.0f;
-    g_upload_data.encoder_rpm_up = fabsf(encoder_rpm);
+    // ========== M 法转速计算 纯整型，不限幅 ==========
+    delta_p = abs(delta_p);                                        // 脉冲差值取绝对值，只算转速大小
+    rpm_tmp = delta_p * 60 * 1000;                                 // M法转速公式分子
+    rpm_tmp = rpm_tmp / (ENCODER_PUL_PER_ROUND * sample_ms);       // 除以分母得到转速
+    rpm = (int16_t)rpm_tmp;
+    encoder_rpm = rpm;                                             // 全局转速变量，供给电机控制
+    rpm_abs = (rpm >= 0) ? (uint16_t)rpm : (uint16_t)(-rpm);       // 转速绝对值，用于界面上报
+    g_upload_data.encoder_rpm_up = rpm_abs;                         // 转速存入上报结构体
 }
-
 
 /**************************************
  * @brief  GPIO外部中断回调函数
@@ -153,7 +120,16 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
     uint8_t A_now, B_now;
     encoder_sample_flag = 1; /**< 标记编码器产生边沿采样事件 */
-
+	
+	if(GPIO_Pin == GPIO_PIN_12)
+    {
+        //Z相到来，清零原始脉冲计数器
+        encoder_cnt = 0;
+        //【关键适配】同步把上一次记录也清零，消除巨大delta跳变
+        encoder_z_flag = 1;
+        return;
+    }
+	
     if(GPIO_Pin == GPIO_PIN_10 || GPIO_Pin == GPIO_PIN_11)
     {
         A_now = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_10); /**< 读取当前A相电平 */
@@ -188,38 +164,19 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         encoder_A_last = A_now; /**< 更新A相历史电平，用于下一次边沿判断 */
         encoder_B_last = B_now; /**< 更新B相历史电平，用于下一次边沿判断 */
     }
-    else if(GPIO_Pin == GPIO_PIN_12)
-    {
-        //Z相到来，设置零点偏移，不清原始脉冲计数器！！！
-        encoder_zero_offset = encoder_cnt;
-    }
 }
 
 /**************************************
  * @brief  编码器定时采样处理函数
  * @param[in]  None
  * @return  无
- * @note    由TIM6每20ms调用一次;执行转速计算并做一阶低通滤波
+ * @note    由TIM6每1ms调用一次;执行转速计算并做一阶低通滤波
  * @warning 运行在中断上下文,禁止调用耗时函数、阻塞接口
  *************************************/
 void Spl_Encoder_Timer_ISR(void)
 {
-    static float rpm_filter = 0.0f;
-    const float filter_k = 0.1f;
-    Spl_Encoder_CalcSpeedAndAngle(100);  // 你的采集周期是100ms，同步改掉20
-	scissor_window_check(2000,60);
-    // 只限制最大绝对值
-    if(encoder_rpm > 3000)
-    {
-        encoder_rpm = rpm_filter;
-    }
-    if(encoder_rpm < -3000)
-    {
-        encoder_rpm = rpm_filter;
-    }
-
-    rpm_filter = rpm_filter * (1.0f - filter_k) + encoder_rpm * filter_k;
-    encoder_rpm = rpm_filter;
+    Spl_Encoder_CalcSpeedAndAngle(1);  // 定时器采集周期为1ms
+	scissor_window_check(2000,60);  // 剪刀电机位置检测，2000us脉冲间隔，60个编码器脉冲偏移量
 }
 
 

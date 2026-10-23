@@ -268,20 +268,19 @@ void Modbus_CmdParse(void)
     }
 
     // ========== 电子夹棍 ==========
-    if(cmd == CTRL_BIT_CLAMP_JOG_FWD)
-    {   
-//        DebugPrint("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n");
-        CANOPEN_Motor_SetVelocity(&g_step_node, 20);
-        delay_ms(5); //延时5ms，确保速度设置生效
-        CANOPEN_Motor_Enable(&g_step_node);
+    if(cmd == CTRL_BIT_CLAMP_JOG_FWD)        // 夹棍点动正转指令
+    {     
+        CANOPEN_Motor_SetVelocity(&g_step_node, 20);  // 设置电机目标速度20转/分钟
+        delay_ms(5);                                  // 延时等待速度配置生效
+        CANOPEN_Motor_Enable(&g_step_node);           // 使能伺服电机，开始运行
     }
-    if(cmd == CTRL_BIT_CLAMP_JOG_REV)
+    if(cmd == CTRL_BIT_CLAMP_JOG_REV)        // 夹棍点动反转指令
     {   
-//        DebugPrint("BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB\n");
-        CANOPEN_Motor_SetVelocity(&g_step_node, -20);
-        delay_ms(5); //延时5ms，确保速度设置生效
-        CANOPEN_Motor_Enable(&g_step_node);
+        CANOPEN_Motor_SetVelocity(&g_step_node, -20); // 设置电机目标速度20转/分钟（反转）
+        delay_ms(5);                                  // 延时等待速度配置生效
+        CANOPEN_Motor_Enable(&g_step_node);           // 使能伺服电机，开始运行
     }
+
 
     // =====【握手关键】处理完成，清空控制寄存器=====
     modbus_holding_reg[6] = 0;

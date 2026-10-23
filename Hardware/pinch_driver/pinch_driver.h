@@ -1,16 +1,11 @@
-/************************************************
- * @file    bsp_encoder.c
- * @brief   编码器BSP底层驱动,AB相正交4倍频采集,TIM7定时测速
- * @author  MO wenzhi
- * @version V1.0
- * @date    2026.10.09
- * @note    适配百纳BN5058系列编码,PC10:A PC11:B
- ***********************************************/
- 
 #ifndef _PINCH_DRIVER_H
 #define _PINCH_DRIVER_H
 #include <stdint.h>
 #include <stdbool.h>
+#include "bsp_can.h"
+#include <string.h>
+#include <stdlib.h>
+
 
 #ifdef __cplusplus
 extern "C" {
@@ -47,6 +42,8 @@ typedef enum {
 
 #define OD_MOTOR_RATED_CURR    0x2031    //额定电流，只读
 #define OD_TORQUE_MAX_CURR     0x203B    //力矩上限电流，sub 01
+
+#define RPM_STOP_THRESHOLD 5             //判断主轴电机运动状态
 
 /**
  * @brief STEP专用CAN报文结构体，避免和CanFrame_t重定义冲突
@@ -90,6 +87,10 @@ STEP_CO_Err_t CANOPEN_Motor_SetTargetPos(CAN_Step_Node_t *node, int32_t pos_val)
 STEP_CO_Err_t CANOPEN_Motor_SetProfileVel(CAN_Step_Node_t *node, uint32_t vel_val);//速度配置，PP模式专用
 STEP_CO_Err_t CANOPEN_Motor_NewSetPoint(CAN_Step_Node_t *node); //PP专属触发点位
 
+void CANOPEN_Motor_CtrlWord_EnableOp(CAN_Step_Node_t *node);
+void CANOPEN_Motor_CtrlWord_NewSetpoint(CAN_Step_Node_t *node);
+
+
 void Pinch_Motor_task(void); //电子夹纱器电机任务，放在主循环while(1)轮询调用
 
 
@@ -102,4 +103,6 @@ void CANOPEN_RxProcess(CAN_Step_Node_t *node, const StepCanFrame_t *frame);
 #ifdef __cplusplus
 }
 #endif
+
 #endif
+

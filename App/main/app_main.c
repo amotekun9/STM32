@@ -14,15 +14,12 @@ void app_main(void)
     RS485_Dev_t *vfd = RS485_GetDevice(&RS485_HANDLE);
     RS485_Dev_t *tpc = RS485_GetDevice(&MAX485_HANDLE);
     modbus_slave_init();                               //与触摸屏通讯任务
-    /* 2. 初始化 CiA402 节点 (CAN ID = 4) */
-	CIA402_InitAndRegisterNode(&g_servo_node_1, 4);
-    CIA402_InitAndRegisterNode(&g_servo_node_2, 5);
-    /* 3. 启动 CAN 接收及中断 */
     BSP_CAN_Start();
-	delay_ms(5);
-    CANOPEN_Motor_Init(&g_step_node, 127);
-    
+	CIA402_InitAndRegisterNode(&g_servo_node_1, 1);
+    CIA402_InitAndRegisterNode(&g_servo_node_2, 2);
+    CANOPEN_Motor_Init(&g_step_node, 3);
 
+	
     while (1)
     {
         /* 双路高频轮询看门狗与数据同步 */
@@ -40,10 +37,10 @@ void app_main(void)
         /* 处理电子夹纱器请求 */
         Pinch_Motor_task(); //夹持电机任务，必须不断轮询，处理主机请求; 
         
-        
-		CANopen_ProcessBus();
+		scissor_poll(); //剪刀电机任务，必须不断轮询，处理主机请求; 
+
+		CANopen_ProcessBus();   //处理 CANopen 总线
 		
-		scissor_poll();
     }
 }
 
