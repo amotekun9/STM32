@@ -305,6 +305,7 @@ void Modbus_CmdParse(void)
         scissor_open_trig(2000);
     }
 
+    // ========== 电子夹辊 ==========
     // 【夹棍慢动正转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
     if(cmd == CTRL_BIT_CLAMP_JOG_FWD)
     {
@@ -315,7 +316,14 @@ void Modbus_CmdParse(void)
     {
         Clamp_Jog_SingleStep(&g_step_node1, -1);
     }
+    
+    if(cmd == CTRL_BIT_CLAMP_STOP)
+    {
+        CANOPEN_Motor_Disable(&g_step_node1);
+    }
+    
 
+    // ========== 屏幕参数保存 ==========
     if(cmd == CTRL_BIT_PARAM_SAVE)
     {
         upload_param_save();
