@@ -23,7 +23,7 @@ extern "C" {
 typedef struct
 {
     uint16_t encoder_angle_up;      // modbus_holding_reg[0]：主轴当前角度
-    uint16_t gear_ratio_up;         // modbus_holding_reg[1]：电子绞边减速比
+    uint16_t weft_density_up;         // modbus_holding_reg[1]：纬密
     uint16_t left_edge_pos_up;      // modbus_holding_reg[2]：左侧电子绞边位置
     uint16_t right_edge_pos_up;     // modbus_holding_reg[3]：右侧电子绞边位置
     uint16_t cut_star_angle_up;       // modbus_holding_reg[4]：自动剪切时间间隔
@@ -64,6 +64,8 @@ void Modbus_CmdParse(void);
 
 void modbus_slave_task(void);
 void modbus_slave_init(void);
+
+void Clamp_Jog_SingleStep(CAN_Step_Node_t *pNode, int8_t dir);
 
 
 #ifdef __cplusplus
