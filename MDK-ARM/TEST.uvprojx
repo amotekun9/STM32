@@ -365,7 +365,7 @@
               <MiscControls></MiscControls>
               <Define>USE_HAL_DRIVER,STM32F103xE</Define>
               <Undefine></Undefine>
-              <IncludePath>../Core/Inc;../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy;../Drivers/STM32F1xx_HAL_Driver/Inc;../Drivers/CMSIS/Device/ST/STM32F1xx/Include;../Drivers/CMSIS/Include;../App/main;../BSP/can;../BSP/delay;../BSP/timer;../BSP/usart;../Hardware/biss_coder;../Middleware/Protocol/CANopen;../BSP/rs485;../Middleware/RingBuffer;../BSP/dma;../Middleware/Protocol/Modbus;../Hardware/vfd_driver;../Hardware/tpc_slave;../Hardware/spindle_coder;../Hardware/pinch_driver;../Hardware/scissor_driver</IncludePath>
+              <IncludePath>../Core/Inc;../Drivers/STM32F1xx_HAL_Driver/Inc/Legacy;../Drivers/STM32F1xx_HAL_Driver/Inc;../Drivers/CMSIS/Device/ST/STM32F1xx/Include;../Drivers/CMSIS/Include;../App/main;../BSP/can;../BSP/delay;../BSP/timer;../BSP/usart;../Hardware/biss_coder;../Middleware/Protocol/CANopen;../BSP/rs485;../Middleware/RingBuffer;../BSP/dma;../Middleware/Protocol/Modbus;../Hardware/vfd_driver;../Hardware/tpc_slave;../Hardware/spindle_coder;../Hardware/pinch_driver;../Hardware/scissor_driver;..\BSP\flash</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -931,6 +931,11 @@
               <FileName>bsp_rs485.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\BSP\rs485\bsp_rs485.c</FilePath>
+            </File>
+            <File>
+              <FileName>bsp_flash.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\BSP\flash\bsp_flash.c</FilePath>
             </File>
           </Files>
         </Group>
