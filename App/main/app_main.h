@@ -23,6 +23,7 @@ extern "C" {
 #include "spindle_coder.h"
 #include "pinch_driver.h"
 #include "scissor_driver.h"
+#include "bsp_flash.h"
 	
 void app_main(void);
 
