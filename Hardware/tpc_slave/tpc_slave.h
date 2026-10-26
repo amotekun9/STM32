@@ -44,6 +44,8 @@ typedef struct
 #define CTRL_BIT_CLAMP_JOG_FWD      9   // bit8：电子夹棍慢动正转
 #define CTRL_BIT_CLAMP_JOG_REV      10  // bit9：电子夹棍慢动反转
 #define CTRL_BIT_PARAM_SAVE         11  // bit10：参数保存按钮
+#define CTRL_BIT_CLAMP_STOP         12  // bit11：电子夹棍停止
+
 
 
 

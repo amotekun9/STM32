@@ -61,8 +61,8 @@ void STEP_Motor_Init(CAN_Step_Node_t *node)
     CANopen_SDO_Write8(node, OD_CONTROL_WORD, 0x00, 79);
     delay_ms(5);
     CANopen_SDO_Write8(node, OD_CONTROL_WORD, 0x00, 95);
-    // delay_ms(5);
-    // CANOPEN_Motor_Disable(node);            //控制字0x06，停机
+    delay_ms(5);
+    CANOPEN_Motor_Disable(node);            //控制字0x06，停机
 
 }
 
