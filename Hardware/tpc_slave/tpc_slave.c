@@ -14,6 +14,12 @@
 // Modbus RTU 3.5字符静默超时(ms)，9600=5ms，19200=3ms
 #define MODBUS_FRAME_INTERVAL_MS    1
 
+#define SCALE       100UL                // 定点放大倍数
+#define COEFF_VAL   318471UL             // 换算系数：3184.71 * 100
+
+uint16_t g_weft_density;           // 纬密，单位 picks/cm（根/厘米）
+static int32_t  g_jog_err_acc = 0;        // 慢动独立误差累加器，和织造进给误差分开
+
 static uint8_t  modbus_tx_buf[MODBUS_TX_BUF_SIZE];
 uint16_t modbus_holding_reg[MODBUS_HOLD_REG_COUNT] = {0};
 
@@ -21,7 +27,7 @@ uint16_t modbus_holding_reg[MODBUS_HOLD_REG_COUNT] = {0};
 UploadData_t g_upload_data = {0};
 // 全局控制指令寄存器
 extern uint16_t g_ctrl_cmd_reg = 0;
-CAN_Step_Node_t g_step_node;
+CAN_Step_Node_t g_step_node1;
 
 // Modbus CRC16 查表
 static const uint16_t crc16_table[] = {
@@ -201,19 +207,52 @@ void modbus_slave_init(void)
 void ModbusHolding_RefreshUpload(void)
 {
     // ========== 第一步：优先读取触摸屏下发的参数、控制命令（最重要！先读后写，防止屏下发的值被覆盖） ==========
-    g_upload_data.gear_ratio_up      = modbus_holding_reg[1];       // 绞边减速比，触摸屏可修改参数
+    g_upload_data.weft_density_up      = modbus_holding_reg[1];       // 纬密，触摸屏可修改参数
     g_upload_data.cut_star_angle_up   = modbus_holding_reg[4];      // 剪刀起始剪切角度，触摸屏可修改参数
     g_upload_data.cut_return_angle_up= modbus_holding_reg[5];       // 剪刀回位角度，触摸屏可修改参数
     g_ctrl_cmd_reg = modbus_holding_reg[6];                         // 控制命令寄存器，仅读取，单片机不回写
 
     // ========== 第二步：本地采集变量/参数 刷新到Modbus保持寄存器，用于触摸屏读取上报和参数回显 ==========
     modbus_holding_reg[0] = g_upload_data.encoder_angle_up;         // 主轴编码器角度，采集上报，只读
-    modbus_holding_reg[1] = g_upload_data.gear_ratio_up;             // 绞边减速比，参数回显
+    modbus_holding_reg[1] = g_upload_data.weft_density_up;             // 纬密，参数回显
     modbus_holding_reg[2] = g_upload_data.left_edge_pos_up;          // 左绞边位置，采集上报，只读
     modbus_holding_reg[3] = g_upload_data.right_edge_pos_up;        // 右绞边位置，采集上报，只读
     modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;        // 剪刀起始剪切角度，参数回显
     modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;      // 剪刀回位角度，参数回显
     modbus_holding_reg[7] = g_upload_data.encoder_rpm_up;           // 主轴实时转速，采集上报，只读 
+}
+
+/**
+ * @brief  夹棍慢动单步，走1个纬纱间距，带余数补偿，CiA402 PP相对定位模式
+ * @param  pNode    电机CANopen节点指针
+ * @param  dir      运动方向：1=正转，-1=反转
+ * @retval 无
+ * @note   脉冲型指令触发，调用一次执行一次定位，走完自动停止
+ *         公式：每纬脉冲 = COEFF_VAL / g_weft_density / SCALE
+ *         余数持续累加，攒够SCALE补偿1个脉冲，保证长期平均纬密准确
+ */
+void Clamp_Jog_SingleStep(CAN_Step_Node_t *node, int8_t dir)
+{
+    uint32_t p_scaled;                   // 放大100倍后的单纬脉冲值
+    uint32_t pulse_int;                  // 本次整数脉冲
+    uint32_t pulse_rem;                  // 本次余数
+    int32_t  send_pulse;                 // 下发给驱动器的脉冲（带方向符号）
+
+    g_weft_density = g_upload_data.weft_density_up;
+    p_scaled = COEFF_VAL / g_weft_density;
+    pulse_int = p_scaled / SCALE;        // 取出整数部分脉冲
+    pulse_rem = p_scaled % SCALE;        // 取出余数部分
+
+    g_jog_err_acc += pulse_rem;          // 余数存入误差累加器
+    if(g_jog_err_acc >= SCALE)           // 余数累计达到阈值，补偿1脉冲
+    {
+        pulse_int += 1;
+        g_jog_err_acc -= SCALE;
+    }
+
+    send_pulse = (int32_t)pulse_int * dir;   // 带上方向符号
+    CANOPEN_Motor_SetVelocity (node, send_pulse);  // 设置相对定位脉冲
+    CANOPEN_Motor_Enable (node);                // 启动PP定位运行
 }
 
 /**
@@ -266,20 +305,16 @@ void Modbus_CmdParse(void)
         scissor_open_trig(2000);
     }
 
-    // ========== 电子夹棍 ==========
-    if(cmd == CTRL_BIT_CLAMP_JOG_FWD)        // 夹棍点动正转指令
-    {     
-        CANOPEN_Motor_SetVelocity(&g_step_node, 20);  // 设置电机目标速度20转/分钟
-        delay_ms(5);                                  // 延时等待速度配置生效
-        CANOPEN_Motor_Enable(&g_step_node);           // 使能伺服电机，开始运行
+    // 【夹棍慢动正转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
+    if(cmd & CTRL_BIT_CLAMP_JOG_FWD)
+    {
+        Clamp_Jog_SingleStep(&g_step_node1, 1);
     }
-    if(cmd == CTRL_BIT_CLAMP_JOG_REV)        // 夹棍点动反转指令
-    {   
-        CANOPEN_Motor_SetVelocity(&g_step_node, -20); // 设置电机目标速度20转/分钟（反转）
-        delay_ms(5);                                  // 延时等待速度配置生效
-        CANOPEN_Motor_Enable(&g_step_node);           // 使能伺服电机，开始运行
+    // 【夹棍慢动反转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
+    if(cmd & CTRL_BIT_CLAMP_JOG_REV)
+    {
+        Clamp_Jog_SingleStep(&g_step_node1, -1);
     }
-
 
     // =====【握手关键】处理完成，清空控制寄存器=====
     modbus_holding_reg[6] = 0;

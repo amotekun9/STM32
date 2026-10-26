@@ -98,7 +98,10 @@ typedef struct {
     int32_t         actual_pos;         /* 实际位置反馈 (0x6064) */
     int32_t         actual_vel;         /* 实际速度反馈 (0x606C) */
     int16_t         actual_tor;         /* 实际转矩反馈 (0x6077) */
+
 } CIA402_Node_t;
+
+typedef CIA402_Node_t CAN_Step_Node_t;  //电子夹辊，步进电机专用
 
 /************************ 硬件底层发送接口声明 ************************/
 /**
