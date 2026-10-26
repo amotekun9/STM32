@@ -306,15 +306,22 @@ void Modbus_CmdParse(void)
     }
 
     // 【夹棍慢动正转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
-    if(cmd & CTRL_BIT_CLAMP_JOG_FWD)
+    if(cmd == CTRL_BIT_CLAMP_JOG_FWD)
     {
         Clamp_Jog_SingleStep(&g_step_node1, 1);
     }
     // 【夹棍慢动反转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
-    if(cmd & CTRL_BIT_CLAMP_JOG_REV)
+    if(cmd == CTRL_BIT_CLAMP_JOG_REV)
     {
         Clamp_Jog_SingleStep(&g_step_node1, -1);
     }
+
+    if(cmd == CTRL_BIT_PARAM_SAVE)
+    {
+        upload_param_save();
+        cmd &= ~(1U << CTRL_BIT_PARAM_SAVE); // 清除保存标志位
+    }
+
 
     // =====【握手关键】处理完成，清空控制寄存器=====
     modbus_holding_reg[6] = 0;

@@ -14,15 +14,13 @@ void app_main(void)
     RS485_Dev_t *vfd = RS485_GetDevice(&RS485_HANDLE); 
     RS485_Dev_t *tpc = RS485_GetDevice(&MAX485_HANDLE);
     modbus_slave_init();                               //与触摸屏通讯任务
+    upload_param_load();  //加载保存参数
     BSP_CAN_Start();
 	CIA402_InitAndRegisterNode(&g_servo_node_1, 1);
     CIA402_InitAndRegisterNode(&g_servo_node_2, 2);
     CIA402_InitAndRegisterNode(&g_step_node, 3);
     STEP_Motor_Init(&g_step_node);
 
-	
-
-    
     while (1)
     {
         /* 双路高频轮询看门狗与数据同步 */
