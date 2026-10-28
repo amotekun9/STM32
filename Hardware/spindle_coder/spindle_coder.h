@@ -7,37 +7,39 @@
  * @note    适配百纳BN5058系列编码,PC10:A PC11:B
  ***********************************************/
  
-#ifndef _SPINDLE_CODER_H
-#define _SPINDLE_CODER_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "stm32f1xx_hal.h"
 #include "scissor_driver.h"
 #include "tpc_slave.h"
 #include <stdlib.h>
 
-#define ENCODER_LINE     360U   //增量式光电编码器线数
-#define ENCODER_PUL_PER_ROUND  (ENCODER_LINE * 4U)  //4倍频
+#ifndef __SPINDLE_CODER_H
+#define __SPINDLE_CODER_H
+#include "app_main.h"
 
-extern int32_t encoder_cnt;
-extern int16_t encoder_angle;     //角度 单位°
-extern int16_t encoder_rpm;       //转速 单位 r/min
-extern uint8_t encoder_sample_flag;
-extern uint8_t encoder_z_flag;
+#define CODER_FILTER_K     4        // 编码器速度一阶滤波系数，数值越大滤波越强、响应越慢
+#define ENC_PULSE_PER_ROUND 360     // 编码器单圈原始脉冲数（四倍频前）
 
-int32_t Spl_Encoder_GetCount(void);
-void Spl_Encoder_ResetCount(void);
-void Spl_Encoder_CalcSpeedAndAngle(uint32_t sample_ms); //sample_ms 采样周期,单位ms
-void Spl_Encoder_Timer_ISR(void);
-	
-	
+/**
+ * @brief 编码器数据结构体
+ */
+typedef struct
+{
+    int32_t pos;         // 单圈累计脉冲位置
+    int32_t speed_raw;   // 原始速度，本次采样间隔脉冲增量
+    int32_t speed_filt;  // 滤波平滑后的速度
+}Coder_t;
 
-#ifdef __cplusplus
-}
+extern int32_t encoder_cnt;        // 主轴脉冲计数，和coder.pos同步
+extern int32_t encoder_rpm;         // 主轴转速，单位 rpm
+extern int32_t encoder_angle;      // 主轴角度，0~3600，放大10倍，代表0.1°精度
+extern uint8_t encoder_z_flag;     // Z相标记位：1=收到Z脉冲，等待采样点清零
+
+void Coder_Init(void);              // 编码器初始化，启动TIM编码器、TIM6定时采样
+void Coder_Reset(void);             // 编码器手动清零，重置位置、角度、速度
+void Coder_Callback(void);          // TIM6定时采样回调，计算脉冲、转速、角度
+void Coder_Z_Phase_Callback(void);   // Z相中断处理函数，仅置标记，不在中断内清零
+
 #endif
 
-#endif /* __encoder_H */ 
+
 

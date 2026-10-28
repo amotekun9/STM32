@@ -10,7 +10,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
     if (htim->Instance == BASIC_TIM6)
     {
-		Spl_Encoder_Timer_ISR();
+      Coder_Callback();
     }
 }
 

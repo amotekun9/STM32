@@ -268,66 +268,66 @@ void Modbus_CmdParse(void)
     }
 
     // ========== 左侧电子绞边 ==========
-    if(cmd == CTRL_BIT_LEFT_EDGE_JOG_FWD)
+    if(cmd == CTRL_LEFT_EDGE_JOG_FWD)
     {
         // LeftEdge_JogForward();
     }
-    if(cmd == CTRL_BIT_LEFT_EDGE_JOG_REV)
+    if(cmd == CTRL_LEFT_EDGE_JOG_REV)
     {
         // LeftEdge_JogReverse();
     }
-    if(cmd == CTRL_BIT_LEFT_EDGE_HOME)//归零
+    if(cmd == CTRL_LEFT_EDGE_HOME)//归零
     {
         // LeftEdge_Home();
     }
 
     // ========== 右侧电子绞边 ==========
-    if(cmd == CTRL_BIT_RIGHT_EDGE_JOG_FWD)
+    if(cmd == CTRL_RIGHT_EDGE_JOG_FWD)
     {
         // RightEdge_JogForward();
     }
-    if(cmd == CTRL_BIT_RIGHT_EDGE_JOG_REV)
+    if(cmd == CTRL_RIGHT_EDGE_JOG_REV)
     {
         // RightEdge_JogReverse();
     }
-    if(cmd == CTRL_BIT_RIGHT_EDGE_HOME) //归零
+    if(cmd == CTRL_RIGHT_EDGE_HOME) //归零
     {
         // RightEdge_Home();
     }
 
     // ========== 电子剪刀 ==========
-    if(cmd == CTRL_BIT_CUT_ACTION)  //手动剪切close
+    if(cmd == CTRL_CUT_ACTION)  //手动剪切close
     {
         scissor_close_trig(2000);
     }
-    if(cmd == CTRL_BIT_CUT_HOME) //归位open
+    if(cmd == CTRL_CUT_HOME) //归位open
     {
         scissor_open_trig(2000);
     }
 
     // ========== 电子夹辊 ==========
     // 【夹棍慢动正转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
-    if(cmd == CTRL_BIT_CLAMP_JOG_FWD)
+    if(cmd == CTRL_CLAMP_JOG_FWD)
     {
         Clamp_Jog_SingleStep(&g_step_node1, 1);
     }
     // 【夹棍慢动反转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
-    if(cmd == CTRL_BIT_CLAMP_JOG_REV)
+    if(cmd == CTRL_CLAMP_JOG_REV)
     {
         Clamp_Jog_SingleStep(&g_step_node1, -1);
     }
     
-    if(cmd == CTRL_BIT_CLAMP_STOP)
+    if(cmd == CTRL_CLAMP_STOP)
     {
         CANOPEN_Motor_Disable(&g_step_node1);
     }
     
 
     // ========== 屏幕参数保存 ==========
-    if(cmd == CTRL_BIT_PARAM_SAVE)
+    if(cmd == CTRL_PARAM_SAVE)
     {
         upload_param_save();
-        cmd &= ~(1U << CTRL_BIT_PARAM_SAVE); // 清除保存标志位
+        cmd &= ~(1U << CTRL_PARAM_SAVE); // 清除保存标志位
     }
 
 

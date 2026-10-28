@@ -34,9 +34,9 @@ void STEP_Motor_Init(CAN_Step_Node_t *node)
         return ;
     }
     // ===== PV速度模式初始化代码块 =====
-    CANOPEN_Motor_SetTorqueMaxCurrent(node, 1000);//配置电流mA
+    // CANOPEN_Motor_SetTorqueMaxCurrent(node, 1000);//配置电流mA
 	// delay_ms(5);
-    // CANOPEN_Motor_SetVelocity(node, 0);
+    // CANOPEN_Motor_SetVelocity(node, 300);
 	// delay_ms(5);
     // CANOPEN_Motor_SetPVMode(node);
 	// delay_ms(5);
@@ -50,7 +50,7 @@ void STEP_Motor_Init(CAN_Step_Node_t *node)
     // ===== PP位置模式初始化代码块 =====
     CANOPEN_Motor_SetTargetPos(node, 0);   //607A = 0 位置配置脉冲数，一个脉冲0.01°精度
     delay_ms(5);
-    CANOPEN_Motor_SetProfileVel(node, 200); //6081 = 200  速度配置
+    CANOPEN_Motor_SetProfileVel(node, 400); //6081 = 200  速度配置，减速比1/2，输入800，实际400
     delay_ms(5);
     CANOPEN_Motor_SetPPMode(node);          //6060 = 1    
     delay_ms(5);
@@ -58,9 +58,9 @@ void STEP_Motor_Init(CAN_Step_Node_t *node)
     delay_ms(5);
     CANOPEN_Motor_Ready(node);              //控制字0x07，准备上电
     delay_ms(5);
-    CANopen_SDO_Write8(node, OD_CONTROL_WORD, 0x00, 79);
+    CANopen_SDO_Write16(node, OD_CONTROL_WORD, 0x00, 79);
     delay_ms(5);
-    CANopen_SDO_Write8(node, OD_CONTROL_WORD, 0x00, 95);
+    CANopen_SDO_Write16(node, OD_CONTROL_WORD, 0x00, 95);
     delay_ms(5);
     CANOPEN_Motor_Disable(node);            //控制字0x06，停机
 
@@ -255,11 +255,11 @@ void Pinch_Motor_task(void)
         z_trigger_flag = 1;                             // 置位本任务内Z相触发标记
         if(last_dir_cnt > 0)
         {
-            target_cnt_N = 50;                         // 主轴正向，夹棍定位目标+500脉冲
+            target_cnt_N = 500;                         // 主轴正向，夹棍定位目标+500脉冲
         }
         else
         {
-            target_cnt_N = -50;                         // 主轴反向，夹棍定位目标-500脉冲
+            target_cnt_N = -500;                         // 主轴反向，夹棍定位目标-500脉冲
         }
     }
 
