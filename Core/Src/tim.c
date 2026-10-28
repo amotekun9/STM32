@@ -138,34 +138,6 @@ void HAL_TIM_Encoder_MspInit(TIM_HandleTypeDef* tim_encoderHandle)
   }
 }
 
-// void HAL_TIM_Encoder_MspInit(TIM_HandleTypeDef* tim_encoderHandle)
-// {
-//   GPIO_InitTypeDef GPIO_InitStruct = {0};
-//   if(tim_encoderHandle->Instance==TIM4)
-//   {
-//     __HAL_RCC_TIM4_CLK_ENABLE();
-//     __HAL_RCC_GPIOD_CLK_ENABLE();
-//     // PD12 改成推挽输出
-//     GPIO_InitStruct.Pin = GPIO_PIN_12;
-//     GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-//     GPIO_InitStruct.Pull = GPIO_NOPULL;
-//     GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-//     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-//     HAL_GPIO_WritePin(GPIOD, GPIO_PIN_12, GPIO_PIN_SET); // 上电写1
-
-//     // PD13 保留TIM4_CH2编码器输入
-//     GPIO_InitStruct.Pin = GPIO_PIN_13;
-//     GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-//     GPIO_InitStruct.Pull = GPIO_PULLUP;
-//     HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
-
-//     __HAL_AFIO_REMAP_TIM4_ENABLE();
-//     HAL_NVIC_SetPriority(TIM4_IRQn, 0, 0);
-//     HAL_NVIC_EnableIRQ(TIM4_IRQn);
-//   }
-// }
-
-
 void HAL_TIM_Base_MspInit(TIM_HandleTypeDef* tim_baseHandle)
 {
 
