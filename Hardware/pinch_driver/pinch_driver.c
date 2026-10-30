@@ -34,9 +34,9 @@ void STEP_Motor_Init(CAN_Step_Node_t *node)
         return ;
     }
     // ===== PV速度模式初始化代码块 =====
-    // CANOPEN_Motor_SetTorqueMaxCurrent(node, 1000);//配置电流mA
-	// delay_ms(5);
-    // CANOPEN_Motor_SetVelocity(node, 300);
+    CANOPEN_Motor_SetTorqueMaxCurrent(node, 1000);//配置电流mA
+	delay_ms(5);
+    // CANOPEN_Motor_SetVelocity(node, 200);
 	// delay_ms(5);
     // CANOPEN_Motor_SetPVMode(node);
 	// delay_ms(5);
@@ -218,69 +218,65 @@ void Pinch_Motor_task(void)
 {
     int32_t current_encoder_cnt = 0;
     int32_t target_cnt_N = 0;
-    static int32_t last_dir_cnt = 0;   // 保存清零前的编码器脉冲快照，用于判断主轴转向
-    static uint8_t last_run_sta = 0;   // 电机上一次运行状态：0停机失能，1运转使能
+    static int32_t last_dir_cnt = 0;
+    static uint8_t last_run_sta = 0;
     uint8_t z_trigger_flag = 0;
     uint8_t now_run_sta;
 
-    current_encoder_cnt = encoder_cnt;                  // 读取当前主轴编码器脉冲值
-    target_cnt_N = current_encoder_cnt / 4;             // 计算电子夹棍跟随目标脉冲
-    z_trigger_flag = 0;                                 // Z相触发标志初始清零
+    current_encoder_cnt = encoder_cnt;
+    target_cnt_N = current_encoder_cnt / 4;
+    z_trigger_flag = 0;
 
-    // 根据主轴转速判断当前运行状态，使用转速绝对值判定启停
     now_run_sta = (encoder_rpm > RPM_STOP_THRESHOLD) ? 1 : 0;
-
-    // 仅在运行状态发生变化时才下发CANopen报文，防止循环频繁发报文
     if(now_run_sta != last_run_sta)
     {
         if(now_run_sta == 0)
-        {   
-            CANOPEN_Motor_SetPVMode(&g_step_node);      // 切换为速度模式
-            delay_ms(5);                                // 等待模式切换生效
-            CANOPEN_Motor_Disable(&g_step_node);         // 电机失能停机
+        {
+            CANOPEN_Motor_SetPVMode(&g_step_node);
+            delay_ms(5);
+            CANOPEN_Motor_Disable(&g_step_node);
         }
         else
         {
-            CANOPEN_Motor_SetPPMode(&g_step_node);      // 切换为点位位置模式
-            delay_ms(5);                                // 等待模式切换生效
-            CANOPEN_Motor_Ready(&g_step_node);           // 电机进入就绪状态
+            CANOPEN_Motor_SetPPMode(&g_step_node);
+            delay_ms(5);
+            CANOPEN_Motor_Ready(&g_step_node);
         }
-        last_run_sta = now_run_sta;                    // 更新状态记录
+        last_run_sta = now_run_sta;
     }
 
-    // Z相零点触发处理（Z相外部中断内置位encoder_z_flag）
-    if(encoder_z_flag == 1)
+    // ========== 这里改成判断 pinch_z_flag ==========
+    if(pinch_z_flag == 1)
     {
-        encoder_z_flag = 0;                            // 清除Z相标志
-        z_trigger_flag = 1;                             // 置位本任务内Z相触发标记
+        pinch_z_flag = 0;        // 只清夹棍自己的flag！！
+        z_trigger_flag = 1;
         if(last_dir_cnt > 0)
         {
-            target_cnt_N = 500;                         // 主轴正向，夹棍定位目标+500脉冲
+            target_cnt_N = 500;
         }
         else
         {
-            target_cnt_N = -500;                         // 主轴反向，夹棍定位目标-500脉冲
+            target_cnt_N = -500;
         }
     }
 
-    // 主轴非零点区间，持续刷新脉冲快照，保存转向信息
     if(current_encoder_cnt != 0)
     {
         last_dir_cnt = current_encoder_cnt;
     }
 
-    // Z相到来，下发PP模式点位定位指令
     if(z_trigger_flag == 1)
     {
-        target_cnt_O = target_cnt_N;                    // 更新上一次目标位置
+        target_cnt_O = target_cnt_N;
         delay_ms(5);
-        CANOPEN_Motor_SetTargetPos(&g_step_node, target_cnt_N); // 设置目标位置脉冲
+        CANOPEN_Motor_SetTargetPos(&g_step_node, target_cnt_N);
         delay_ms(5);
-        CANOPEN_Motor_CtrlWord_EnableOp(&g_step_node);           // 控制字：使能操作
+        CANOPEN_Motor_CtrlWord_EnableOp(&g_step_node);
         delay_ms(5);
-        CANOPEN_Motor_CtrlWord_NewSetpoint(&g_step_node);        // 控制字：新点位触发执行
+        CANOPEN_Motor_CtrlWord_NewSetpoint(&g_step_node);
     }
 }
+
 
 
 
