@@ -10,6 +10,9 @@ void app_main(void)
 {
     delay_init(72);
     bsp_TIM_Base_Start_IT();
+
+    TIM6_SetSampleMs(CODER_SAMPLE_MS);   // 编码器更新时间
+
     Coder_Init();                          //主轴编码器初始化
     RS485_All_Init();
     RS485_Dev_t *vfd = RS485_GetDevice(&RS485_HANDLE); 
