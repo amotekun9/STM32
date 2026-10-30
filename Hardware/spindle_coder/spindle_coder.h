@@ -11,6 +11,7 @@
 #include "scissor_driver.h"
 #include "tpc_slave.h"
 #include <stdlib.h>
+#include "bsp_delay.h"
 
 #ifndef __SPINDLE_CODER_H
 #define __SPINDLE_CODER_H
@@ -19,7 +20,7 @@
 #define CODER_FILTER_K     4        // 编码器速度一阶滤波系数，数值越大滤波越强、响应越慢
 #define ENC_PULSE_PER_ROUND 360     // 编码器单圈原始脉冲数（四倍频前）
 #define RPM_SWITCH_THRESHOLD  50      // 切换阈值 50rpm
-#define CODER_SAMPLE_MS     1U    // 采样周期 1ms
+#define CODER_SAMPLE_MS     30U    // 采样周期 1ms
 
 /**
  * @brief 编码器数据结构体

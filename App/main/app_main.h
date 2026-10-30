@@ -24,7 +24,9 @@ extern "C" {
 #include "pinch_driver.h"
 #include "scissor_driver.h"
 #include "bsp_flash.h"
-	
+#include "selvage_driver.h"
+
+
 void app_main(void);
 
 

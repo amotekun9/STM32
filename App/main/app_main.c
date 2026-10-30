@@ -1,17 +1,12 @@
 #include "app_main.h"
 
 /* 全局 CiA402 节点实例（方便在 Keil Watch 窗口中观察实时状态） */
-CIA402_Node_t g_servo_node_1;
-CIA402_Node_t g_servo_node_2;
+CIA402_Node_t g_servo_node_1,g_servo_node_2;
 CAN_Step_Node_t g_step_node;
-
 
 void app_main(void)
 {
     delay_init(72);
-    bsp_TIM_Base_Start_IT();
-
-    TIM6_SetSampleMs(CODER_SAMPLE_MS);   // 编码器更新时间
 
     Coder_Init();                          //主轴编码器初始化
     RS485_All_Init();
@@ -23,7 +18,11 @@ void app_main(void)
 	CIA402_InitAndRegisterNode(&g_servo_node_1, 1);
     CIA402_InitAndRegisterNode(&g_servo_node_2, 2);
     CIA402_InitAndRegisterNode(&g_step_node, 3);
+	canopen_selvage_nosave_async_pdo_init(&g_servo_node_1);
+	canopen_selvage_nosave_async_pdo_init(&g_servo_node_2);
     STEP_Motor_Init(&g_step_node);                       //电子夹辊步进电机初始化
+
+    bsp_TIM_Base_Start_IT();
 
     while (1)
     {

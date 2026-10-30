@@ -10,7 +10,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
-
+#include "bsp_delay.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -122,6 +122,7 @@ CO_Err_t CIA402_SetHeartbeatTime(CIA402_Node_t *node, uint16_t heartbeat_ms);
 CO_Err_t CANopen_NMT_SendCmd(CIA402_Node_t *node, uint8_t cmd);             
 CO_Err_t CANopen_NMT_Broadcast(uint8_t cmd);                                
 CO_Err_t CANopen_SendSYNC(void);                                            
+CO_Err_t CANopen_SetCyclePeriod(CIA402_Node_t *node, uint32_t period_us);
 
 /* SDO 读写基础接口 */
 CO_Err_t CANopen_SDO_Write8(CIA402_Node_t *node, uint16_t index, uint8_t subindex, uint8_t value);
@@ -130,6 +131,8 @@ CO_Err_t CANopen_SDO_Write32(CIA402_Node_t *node, uint16_t index, uint8_t subind
 
 /* PDO 基础配置与高速收发 */
 CO_Err_t CIA402_SetTxPDO_TransType(CIA402_Node_t *node, uint8_t pdo_index, uint8_t trans_type);
+CO_Err_t CIA402_SetRxPDO_TransType(CIA402_Node_t *node, uint8_t pdo_index, uint8_t trans_type);
+
 CO_Err_t CANopen_SendRxPDO1(CIA402_Node_t *node, uint16_t ctrl_word);       
 CO_Err_t CANopen_SendRxPDO2_Pos(CIA402_Node_t *node, uint16_t ctrl_word, int32_t target_pos);
 void CANopen_RecvHandler(CIA402_Node_t *node, const CanFrame_t *frame);     
@@ -157,6 +160,29 @@ CO_Err_t CIA402_EnableTxPDO2(CIA402_Node_t *node, bool enable);
 CO_Err_t CIA402_EnableTxPDO3(CIA402_Node_t *node, bool enable);
 CO_Err_t CIA402_EnableTxPDO4(CIA402_Node_t *node, bool enable);
 
+/* 1. RxPDO1 仅映射控制字 (0x6040, 16位) */
+CO_Err_t CIA402_MapRxPDO1_OnlyControlword(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO1_OnlyControlword(CIA402_Node_t *node, uint16_t ctrl_word);
+CO_Err_t CIA402_MapRxPDO1_ControlwordAndPos(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO1_ControlwordAndPos(CIA402_Node_t *node, uint16_t ctrl_word, int32_t target_pos);
+
+/* 1. TxPDO1 仅映射控制字 (0x6041, 16位) */
+CO_Err_t CIA402_MapTxPDO1_OnlyStatusword(CIA402_Node_t *node);
+CO_Err_t CIA402_MapTxPDO1_StatuswordAndActualPos(CIA402_Node_t *node);
+
+/* 2. RxPDO2 仅映射运行模式 (0x6060, 8位) */
+CO_Err_t CIA402_MapRxPDO2_OnlyMode(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO2_OnlyMode(CIA402_Node_t *node, uint8_t mode);
+/* 2. TxPDO2 仅映射运行模式 (0x6064, 8位) */
+CO_Err_t CIA402_MapTxPDO2_OnlyActualPos(CIA402_Node_t *node);
+
+/* 3. RxPDO3 仅映射目标位置 (0x607A, 32位) */
+CO_Err_t CIA402_MapRxPDO3_OnlyPos(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO3_OnlyPos(CIA402_Node_t *node, int32_t target_pos);
+
+/* 4. RxPDO4 仅映射目标速度 (0x60FF, 32位) */
+CO_Err_t CIA402_MapRxPDO4_OnlyVel(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO4_OnlyVel(CIA402_Node_t *node, int32_t target_vel);
 #ifdef __cplusplus
 }
 #endif
