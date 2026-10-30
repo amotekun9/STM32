@@ -121,7 +121,8 @@ void Coder_Z_Phase_Callback(void)
     int32_t rpm_temp = (int32_t)abs(coder.speed_filt) * 60000L / (4L * ENC_PULSE_PER_ROUND * CODER_SAMPLE_MS);
     encoder_rpm = rpm_temp;
     g_upload_data.encoder_rpm_up = encoder_rpm;
-
+	
+	scissor_window_check(2000,80);
 	
 	if (selvage_delta != 0)
 	{
