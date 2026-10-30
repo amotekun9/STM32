@@ -91,7 +91,7 @@ void Coder_Z_Phase_Callback(void)
     {
         delta += 65536;
     }
-	int32_t selvage_delta = (int32_t)delta * (int32_t)25;
+	int32_t selvage_delta = (int32_t)delta * (int32_t)50;
     // Z相脉冲到来：同步清零位置、角度，单圈原点对齐
     if(encoder_z_flag == 1)
     {
