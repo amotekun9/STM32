@@ -66,7 +66,6 @@ void Coder_Z_Phase_Callback(void)
 {
     encoder_z_flag = 1;   // 给编码器清零用
     pinch_z_flag = 1;     // 给夹棍任务触发用
-    // DebugPrint("Z PULSE flag set");
 }
 
 
@@ -147,7 +146,11 @@ void Coder_Z_Phase_Callback(void)
      * 末尾 /10：还原放大倍数
      */
     encoder_angle = (coder.pos * 3600L) / (4L * ENC_PULSE_PER_ROUND)/10;
-    g_upload_data.encoder_angle_up = abs(encoder_angle);
+    if(encoder_angle < 0)
+    {
+        encoder_angle = encoder_angle + 360;
+    }
+    g_upload_data.encoder_angle_up = encoder_angle;
 	
 	g_upload_data.left_edge_pos_up = abs((g_servo_node_1.actual_pos%36000)/100);
 	g_upload_data.right_edge_pos_up = abs((g_servo_node_2.actual_pos%36000)/100);

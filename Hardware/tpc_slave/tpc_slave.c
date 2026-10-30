@@ -28,6 +28,8 @@ UploadData_t g_upload_data = {0};
 // 全局控制指令寄存器
 extern uint16_t g_ctrl_cmd_reg = 0;
 extern CAN_Step_Node_t g_step_node;
+extern uint8_t g_drv_mode;
+extern uint8_t g_work_state;
 
 // Modbus CRC16 查表
 static const uint16_t crc16_table[] = {
@@ -233,29 +235,47 @@ void ModbusHolding_RefreshUpload(void)
  */
 void Clamp_Jog_SingleStep(CAN_Step_Node_t *node, int8_t dir)
 {
-    uint32_t p_scaled;                   // 放大100倍后的单纬脉冲值
-    uint32_t pulse_int;                  // 本次整数脉冲
-    uint32_t pulse_rem;                  // 本次余数
-    int32_t  send_pulse;                 // 下发给驱动器的脉冲（带方向符号）
+    uint32_t p_scaled;    // 放大100倍后的单纬脉冲值
+    uint32_t pulse_int;   // 本次整数脉冲
+    uint32_t pulse_rem;   // 本次余数
+    int32_t  send_pulse;  // 下发给驱动器的脉冲（带方向符号）
+
+    // 前提：必须是慢动工况，织造模式下禁止执行点动
+    if(g_work_state != WORK_STATE_JOG)
+    {   
+        return;
+    }
+
+    // ========== 不是速度模式，先切PV ==========
+    if(g_drv_mode != DRV_MODE_PV)
+    {   
+        CANOPEN_Motor_SetPVMode(node);
+        delay_ms(5);
+        CANOPEN_Motor_Ready(node);
+        g_drv_mode = DRV_MODE_PV;
+    }
 
     g_weft_density = g_upload_data.weft_density_up;
     p_scaled = COEFF_VAL / g_weft_density;
-    pulse_int = p_scaled / SCALE;        // 取出整数部分脉冲
-    pulse_rem = p_scaled % SCALE;        // 取出余数部分
+    pulse_int = p_scaled / SCALE;  // 取出整数部分脉冲
+    pulse_rem = p_scaled % SCALE;  // 取出余数部分
 
-    g_jog_err_acc += pulse_rem;          // 余数存入误差累加器
-    if(g_jog_err_acc >= SCALE)           // 余数累计达到阈值，补偿1脉冲
+    g_jog_err_acc += pulse_rem;    // 余数存入误差累加器
+    if(g_jog_err_acc >= SCALE)     // 余数累计达到阈值，补偿1脉冲
     {
         pulse_int += 1;
         g_jog_err_acc -= SCALE;
     }
 
-    send_pulse = (int32_t)pulse_int * dir;   // 带上方向符号
-    // DebugPrint("send_pulse %d\n\r",send_pulse);
-    CANOPEN_Motor_SetVelocity (node, send_pulse);  // 设置相对定位脉冲
+    send_pulse = (int32_t)pulse_int * dir;
+    
+    CANOPEN_Motor_SetVelocity(node, send_pulse);
     delay_ms(5);
-    CANOPEN_Motor_Enable (node);                // 启动PV运行
+    CANOPEN_Motor_Enable(node);
 }
+
+
+
 
 /**
  * @brief  Modbus指令解析，按钮动作处理 + 握手清零
@@ -309,18 +329,20 @@ void Modbus_CmdParse(void)
 
     // ========== 电子夹辊 ==========
     // 【夹棍慢动正转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
-    if(cmd == CTRL_CLAMP_JOG_FWD)
+    if(cmd == CTRL_CLAMP_JOG_FWD) 
     {   
+        g_work_state = WORK_STATE_JOG;
         Clamp_Jog_SingleStep(&g_step_node, 1);
     }
     // 【夹棍慢动反转】脉冲指令触发，单次进给一纬距离，PP相对定位、带误差补偿
     if(cmd == CTRL_CLAMP_JOG_REV)
     {   
+        g_work_state = WORK_STATE_JOG;
         Clamp_Jog_SingleStep(&g_step_node, -1);
     }
-    
     if(cmd == CTRL_CLAMP_STOP)
-    {  
+    {   
+        g_work_state = WORK_STATE_WEAVE;  // 停止进入到织造工况
         CANOPEN_Motor_Disable(&g_step_node);
     }
     

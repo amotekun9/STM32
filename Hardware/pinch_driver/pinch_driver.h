@@ -14,7 +14,6 @@ extern "C" {
 
 #define STEP_OP_PROFILE_VEL     3   /* 轮廓速度模式PV，改名防止和cia402冲突 */
 
-
 #define OD_PROFILE_VEL          0x6081
 #define STEP_OP_PROFILE_POS     1   /* 轮廓位置模式PP */
 #define CTRL_WORD_1F            0x1F
@@ -23,6 +22,14 @@ extern "C" {
 #define OD_TORQUE_MAX_CURR     0x203B    //力矩上限电流，sub 01
 
 #define RPM_STOP_THRESHOLD 5             //判断主轴电机运动状态
+
+#define DRV_MODE_PP     0   // 位置模式（织造）
+#define DRV_MODE_PV     1   // 速度模式（慢动）
+#define WORK_STATE_WEAVE  0 // 织造工况
+#define WORK_STATE_JOG    1 // 慢动工况
+
+extern uint8_t g_drv_mode ;    // 上电默认PP，和驱动器一致，
+extern uint8_t g_work_state ;
 
 
 /************************ API 函数声明 ************************/
