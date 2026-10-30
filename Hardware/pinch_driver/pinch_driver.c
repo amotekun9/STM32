@@ -7,6 +7,8 @@
 #define MSB(x)         ((uint8_t)(((x) >> 8) & 0xFF))
 
 extern CAN_Step_Node_t g_step_node;
+uint8_t g_drv_mode = DRV_MODE_PP;    // 上电默认PP，和驱动器一致，
+uint8_t g_work_state = WORK_STATE_WEAVE;
 
 int32_t target_cnt_N = 0;
 int32_t target_cnt_O = 0;   
@@ -228,52 +230,79 @@ void Pinch_Motor_task(void)
     z_trigger_flag = 0;
 
     now_run_sta = (encoder_rpm > RPM_STOP_THRESHOLD) ? 1 : 0;
-    if(now_run_sta != last_run_sta)
+
+    if(g_work_state == WORK_STATE_JOG)
     {
-        if(now_run_sta == 0)
+        // // 慢动工况：目标PV速度模式
+        if(g_drv_mode != DRV_MODE_PV)
         {
             CANOPEN_Motor_SetPVMode(&g_step_node);
             delay_ms(5);
-            CANOPEN_Motor_Disable(&g_step_node);
+            CANOPEN_Motor_Ready(&g_step_node);
+            g_drv_mode = DRV_MODE_PV;
         }
-        else
+        // 慢动：关闭Z相点位，不跟随
+        pinch_z_flag = 0;
+        last_run_sta = now_run_sta;
+    }
+    else if(g_work_state == WORK_STATE_WEAVE)
+    {
+        // 织造工况：目标PP位置模式
+        if(g_drv_mode != DRV_MODE_PP)
         {
             CANOPEN_Motor_SetPPMode(&g_step_node);
             delay_ms(5);
             CANOPEN_Motor_Ready(&g_step_node);
+            g_drv_mode = DRV_MODE_PP;
         }
-        last_run_sta = now_run_sta;
-    }
 
-    // ========== 这里改成判断 pinch_z_flag ==========
-    if(pinch_z_flag == 1)
-    {
-        pinch_z_flag = 0;        // 只清夹棍自己的flag！！
-        z_trigger_flag = 1;
-        if(last_dir_cnt > 0)
+        // 织造模式下，再根据主轴转速判断使能/失能
+        if(now_run_sta != last_run_sta)
         {
-            target_cnt_N = 500;
+            if(now_run_sta == 0)
+            {
+                // 主轴停：织造停机，失能
+                CANOPEN_Motor_Disable(&g_step_node);
+                last_run_sta = now_run_sta;
+            }
+            else
+            {
+                // 主轴运转：保持PP，已经使能
+                CANOPEN_Motor_Ready(&g_step_node);
+                last_run_sta = now_run_sta;
+            }
         }
-        else
+
+        // Z相点位逻辑，仅织造生效
+        if(pinch_z_flag == 1)
         {
-            target_cnt_N = -500;
+            pinch_z_flag = 0;
+            z_trigger_flag = 1;
+            if(last_dir_cnt > 0)
+            {
+                target_cnt_N = 500;
+            }
+            else
+            {
+                target_cnt_N = -500;
+            }
         }
-    }
 
-    if(current_encoder_cnt != 0)
-    {
-        last_dir_cnt = current_encoder_cnt;
-    }
+        if(current_encoder_cnt != 0)
+        {
+            last_dir_cnt = current_encoder_cnt;
+        }
 
-    if(z_trigger_flag == 1)
-    {
-        target_cnt_O = target_cnt_N;
-        delay_ms(5);
-        CANOPEN_Motor_SetTargetPos(&g_step_node, target_cnt_N);
-        delay_ms(5);
-        CANOPEN_Motor_CtrlWord_EnableOp(&g_step_node);
-        delay_ms(5);
-        CANOPEN_Motor_CtrlWord_NewSetpoint(&g_step_node);
+        if(z_trigger_flag == 1)
+        {
+            target_cnt_O = target_cnt_N;
+            delay_ms(5);
+            CANOPEN_Motor_SetTargetPos(&g_step_node, target_cnt_N);
+            delay_ms(5);
+            CANOPEN_Motor_CtrlWord_EnableOp(&g_step_node);
+            delay_ms(5);
+            CANOPEN_Motor_CtrlWord_NewSetpoint(&g_step_node);
+        }
     }
 }
 
