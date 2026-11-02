@@ -16,8 +16,13 @@ extern "C" {
 #define BASIC_TIM6_HANDLE  				 htim6
 extern TIM_HandleTypeDef BASIC_TIM6_HANDLE;
 
+#define BASIC_TIM7                       TIM7
+#define BASIC_TIM7_HANDLE  				 htim7
+extern TIM_HandleTypeDef BASIC_TIM7_HANDLE;
+
 
 void bsp_TIM6_Base_Start_IT(void);
+void bsp_TIM7_Base_Start_IT(void);
 
 
 

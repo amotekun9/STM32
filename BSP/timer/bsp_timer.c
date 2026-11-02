@@ -1,9 +1,16 @@
 #include "bsp_timer.h"
 #include "spindle_coder.h"
+#include "selvage_driver.h"
+
 
 void bsp_TIM6_Base_Start_IT(void)
 {
     HAL_TIM_Base_Start_IT(&BASIC_TIM6_HANDLE);
+}
+
+void bsp_TIM7_Base_Start_IT(void)
+{
+    HAL_TIM_Base_Start_IT(&BASIC_TIM7_HANDLE);
 }
 
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
@@ -11,6 +18,10 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     if (htim->Instance == BASIC_TIM6)
     {
       Coder_Callback();
+    }
+	if (htim->Instance == BASIC_TIM7)
+    {
+      Selvage_Callback();
     }
 }
 

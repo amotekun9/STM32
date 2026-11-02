@@ -20,10 +20,13 @@ int32_t encoder_cnt = 0;            // 单圈脉冲计数（和coder.pos同步）
 int32_t encoder_rpm = 0;            // 主轴转速 rpm
 int32_t encoder_angle = 0;          // 单圈角度，单位：0.1°，0~3599 代表0.0~359.9°
 uint8_t encoder_z_flag = 0;         // Z相标记：1表示收到Z脉冲，等待采样点清零
-static uint8_t encoder_z_flag_cnt = 0;        
 uint8_t pinch_z_flag = 0;
 uint16_t tim6_sample_ms = 1;
-static int16_t z_flag_save_tim4 = 0;
+
+
+volatile uint8_t encoder_z_flag_cnt = 0;        
+//static int16_t z_flag_save_tim4 = 0;
+
 
 /**
  * @brief 编码器初始化
@@ -74,9 +77,9 @@ void Coder_Z_Phase_Callback(void)
 	enc_last = 0;
 	encoder_angle = 0;
 	encoder_z_flag_cnt ++;
-	if (encoder_z_flag_cnt == 3)
-	{	
-		encoder_z_flag_cnt = 2;
+	if (encoder_z_flag_cnt ==3)
+	{
+		encoder_z_flag_cnt = 2;
 	}	
 	encoder_z_flag = 1;   // 现在这个flag只做标记，TIM6里面不再用它清零
 	pinch_z_flag = 1;	  // 夹棍触发标志保留不变
@@ -91,52 +94,10 @@ void Coder_Z_Phase_Callback(void)
  */
  void Coder_Callback(void)
 {
-//	static bool last_run_sta = 0;
-//	bool now_run_sta = (encoder_rpm != 0) ? 1 : 0;
-
     // 读取TIM4编码器当前硬件计数值（16位）
     int16_t enc_now = (int16_t)__HAL_TIM_GET_COUNTER(&htim4);
 	int16_t delta = enc_now - enc_last;
 	delta = enc_now - enc_last;
-	int32_t selvage_delta = delta;
-	if (encoder_z_flag)
-	{
-		encoder_z_flag = 0;
-//		printf("z_flag_save_tim4=%d\n",z_flag_save_tim4);
-		if (encoder_z_flag_cnt != 1)
-		{
-			if (delta <0 && z_flag_save_tim4<0)
-			{
-				if (z_flag_save_tim4 >-720)
-				{
-					selvage_delta = delta + z_flag_save_tim4;
-				}
-				else
-				{
-					selvage_delta = -1440 - z_flag_save_tim4 +delta;
-				}
-			}
-			else if (delta <0 && z_flag_save_tim4 >0)
-			{
-				selvage_delta = delta - abs(z_flag_save_tim4);
-			}
-			else if (delta >0 && z_flag_save_tim4<0)
-			{
-				selvage_delta = delta + abs(z_flag_save_tim4);
-			}
-			else if (delta >0 && z_flag_save_tim4>0)
-			{
-				if (z_flag_save_tim4 >720)
-				{
-					selvage_delta = delta + 1440 - abs(z_flag_save_tim4);	
-				}
-				else
-				{
-					selvage_delta = delta - z_flag_save_tim4;
-				}
-			}
-		}
-	}
 
     // 16位计数器溢出修正：TIM4编码器是16位，0~65535循环
     // 正向溢出：delta > 16384，说明计数器从0翻到65535，减去65536得到真实增量
@@ -153,12 +114,9 @@ void Coder_Z_Phase_Callback(void)
     coder.pos += delta;                       // 累加脉冲，记录单圈累计位置
     coder.speed_raw = delta;                  // 原始速度：本次采样周期内的脉冲变化量
     // 一阶低通滤波：平滑速度，抑制抖动，滤波系数 K=4
-    coder.speed_filt = (coder.speed_filt * (CODER_FILTER_K - 1) + delta) / CODER_FILTER_K;
-
+//    coder.speed_filt = (coder.speed_filt * (CODER_FILTER_K - 1) + delta) / CODER_FILTER_K;
     enc_last = enc_now;                      // 更新本次计数值，作为下一次采样的基准
-    z_flag_save_tim4 = enc_last;
     encoder_cnt = coder.pos;
-
     /**
      * M法测速公式：RPM = (Δ × 60000) / (4 × P × Ts)
      * Δ：滤波后的脉冲增量 coder.speed_filt
@@ -167,9 +125,10 @@ void Coder_Z_Phase_Callback(void)
      * Ts：CODER_SAMPLE_MS，TIM6采样周期，单位ms
      * 60000 = 60s × 1000ms，时间换算系数
      */
-    int32_t rpm_temp = (int32_t)abs(coder.speed_filt) * 60000L / (4L * ENC_PULSE_PER_ROUND * CODER_SAMPLE_MS);
-    encoder_rpm = rpm_temp;
-    g_upload_data.encoder_rpm_up = encoder_rpm;
+//    int32_t rpm_temp = (int32_t)abs(coder.speed_filt) * 60000L / (4L * ENC_PULSE_PER_ROUND * CODER_SAMPLE_MS);
+//    encoder_rpm = rpm_temp;
+//    g_upload_data.encoder_rpm_up = encoder_rpm;
+
 
     /**
      * 角度计算，输出单位：0.1°
@@ -185,98 +144,10 @@ void Coder_Z_Phase_Callback(void)
         encoder_angle = encoder_angle + 360;
     }
     g_upload_data.encoder_angle_up = encoder_angle;
-
+	
 	scissor_window_check(2000,80);
-	
-	/*如果上次中断采集主轴有脉冲变化，检测当前状态字bit10位置到达标志是否置1
-	打印上次中断和当前的脉冲变化量以及当前主轴、绞边角度*/
-//	if (last_delta != 0)
-//	{
-//		//如果标志位置1，说明上一个位置跟随已完成，将bit10位置到达标志清0
-//		if (g_servo_node_1.status_word & 0x400 )
-//		{
-//			printf("ok\n");
-//			g_servo_node_1.status_word &=~(0x400);
-//		}
-//		else
-//		{
-//			printf("error\n");
-//		}
-//		printf("timer_cnt=%d,last_delta=%d,delta=%d\n",timer_cnt,last_delta,delta);
-//		printf("last_encoder_angle=%d,last_selvage_angle=%d\n\n",last_encoder_angle,g_upload_data.left_edge_pos_up);
-//	}
 
-	//如果中断采集主轴有脉冲变化，将该变化同步给绞边进行位置跟随指令，给100毫秒的跟随完成时间
-	if (selvage_delta != 0)
-	{
-		/*位置跟随模式*/
-		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_1,0x000f,(int32_t)selvage_delta);
-		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_2,0x000f,(int32_t)selvage_delta);
-		delay_ms(6);
-		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_1,0x005f,(int32_t)selvage_delta);
-		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_2,0x005f,(int32_t)selvage_delta);
-		delay_ms(6);
-
-		/*周期同步位置跟随模式*/
-//		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_1,0x000f,(int32_t)delta);
-//		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_2,0x000f,(int32_t)delta);
-//		delay_ms(6);
-//		CANopen_SendSYNC();
-//		delay_ms(1);
-//		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_1,0x005f,(int32_t)delta);
-//		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_2,0x005f,(int32_t)delta);
-//		delay_ms(6);
-//		CANopen_SendSYNC();
-//		delay_ms(2);
-	}
-
-	/*速度跟随模式*/
-//	if (now_run_sta ==1)
-//	{
-//		CANopen_SendRxPDO4_OnlyVel(&g_servo_node_1,rpm_temp*10);
-//		CANopen_SendRxPDO4_OnlyVel(&g_servo_node_2,rpm_temp*10);
-//		delay_ms(6);
-//	}
-//    if(now_run_sta != last_run_sta)
-//    {
-//        if(now_run_sta == 0)	//主轴从运行到停止
-//        {
-//		    CANopen_SendRxPDO4_OnlyVel(&g_servo_node_1,0);
-//			CANopen_SendRxPDO4_OnlyVel(&g_servo_node_2,0);
-//			delay_ms(6);
-//        }
-//        else	//主轴从停止变为运行态
-//        {
-//        	
-//        }
-//        last_run_sta = now_run_sta;                    // 更新状态记录
-//    }
-	
-	/* 绞边与主轴角度1:1*/
-	uint32_t left_pos,right_pos;
-
-	if ((g_servo_node_1.actual_pos -g_servo_node_1.zero_offset) < 0 )
-	{
-
-		left_pos = 360 +((g_servo_node_1.actual_pos -g_servo_node_1.zero_offset)%1440)/4;
-	}
-	else
-	{
-		left_pos = ((g_servo_node_1.actual_pos -g_servo_node_1.zero_offset)%1440)/4;
-	}
-	
-	if ((g_servo_node_2.actual_pos -g_servo_node_2.zero_offset) < 0 )
-	{
-
-		right_pos = 360 +((g_servo_node_2.actual_pos -g_servo_node_2.zero_offset)%1440)/4;
-	}
-	else
-	{
-		right_pos = ((g_servo_node_2.actual_pos -g_servo_node_2.zero_offset)%1440)/4;
-	}
-	g_upload_data.left_edge_pos_up = left_pos;
-	g_upload_data.right_edge_pos_up = right_pos;
-//	printf("enc_now=%d,enc_angle=%d,delta=%d,selvage_delta=%d\n\n",enc_now,encoder_angle,delta,selvage_delta);
+//	printf("enc_now=%d,enc_angle=%d,delta=%d,encoder_rpm=%d\n\n",enc_now,encoder_angle,delta,encoder_rpm);
 }
 
 /**

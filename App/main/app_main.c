@@ -7,13 +7,12 @@ extern int16_t delta;
 void app_main(void)
 {
     delay_init(72);                           //加载保存参数
-//    delay_ms(1000);
+    delay_ms(1000);
     RS485_All_Init();
     RS485_Dev_t *vfd = RS485_GetDevice(&RS485_HANDLE); 
     RS485_Dev_t *tpc = RS485_GetDevice(&MAX485_HANDLE);
     BSP_CAN_Start();
     Coder_Init();                          //主轴编码器初始化
-    bsp_TIM6_Base_Start_IT();
     modbus_slave_init();                               //与触摸屏通讯任务
     upload_param_load();    
 	CIA402_InitAndRegisterNode(&g_servo_node_1, 1);
@@ -21,11 +20,14 @@ void app_main(void)
     CIA402_InitAndRegisterNode(&g_step_node, 3);
 	canopen_selvage_nosave_async_pdo_pp_mode_init(&g_servo_node_1);
 	canopen_selvage_nosave_async_pdo_pp_mode_init(&g_servo_node_2);
+    bsp_TIM6_Base_Start_IT();
+	bsp_TIM7_Base_Start_IT();
 
     STEP_Motor_Init(&g_step_node);                       //电子夹辊步进电机初始化
 
     while (1)
     {
+//	    printf("enc_angle=%d,selvage_angle=%d\n\n",encoder_angle,g_upload_data.left_edge_pos_up);
         /* 双路高频轮询看门狗与数据同步 */
         RS485_Poll(vfd);
         RS485_Poll(tpc);
