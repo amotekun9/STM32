@@ -1,7 +1,7 @@
 #include "bsp_timer.h"
 #include "spindle_coder.h"
 
-void bsp_TIM_Base_Start_IT(void)
+void bsp_TIM6_Base_Start_IT(void)
 {
     HAL_TIM_Base_Start_IT(&BASIC_TIM6_HANDLE);
 }

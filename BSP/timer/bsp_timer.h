@@ -17,7 +17,7 @@ extern "C" {
 extern TIM_HandleTypeDef BASIC_TIM6_HANDLE;
 
 
-void bsp_TIM_Base_Start_IT(void);
+void bsp_TIM6_Base_Start_IT(void);
 
 
 

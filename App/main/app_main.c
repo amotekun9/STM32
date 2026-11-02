@@ -3,33 +3,33 @@
 /* 全局 CiA402 节点实例（方便在 Keil Watch 窗口中观察实时状态） */
 CIA402_Node_t g_servo_node_1,g_servo_node_2;
 CAN_Step_Node_t g_step_node;
-
+extern int16_t delta;
 void app_main(void)
 {
-    delay_init(72);
-
-    Coder_Init();                          //主轴编码器初始化
+    delay_init(72);                           //加载保存参数
+//    delay_ms(1000);
     RS485_All_Init();
     RS485_Dev_t *vfd = RS485_GetDevice(&RS485_HANDLE); 
     RS485_Dev_t *tpc = RS485_GetDevice(&MAX485_HANDLE);
-    modbus_slave_init();                               //与触摸屏通讯任务
-    upload_param_load();                               //加载保存参数
     BSP_CAN_Start();
+    Coder_Init();                          //主轴编码器初始化
+    bsp_TIM6_Base_Start_IT();
+    modbus_slave_init();                               //与触摸屏通讯任务
+    upload_param_load();    
 	CIA402_InitAndRegisterNode(&g_servo_node_1, 1);
     CIA402_InitAndRegisterNode(&g_servo_node_2, 2);
     CIA402_InitAndRegisterNode(&g_step_node, 3);
-	canopen_selvage_nosave_async_pdo_init(&g_servo_node_1);
-	canopen_selvage_nosave_async_pdo_init(&g_servo_node_2);
-    STEP_Motor_Init(&g_step_node);                       //电子夹辊步进电机初始化
+	canopen_selvage_nosave_async_pdo_pp_mode_init(&g_servo_node_1);
+	canopen_selvage_nosave_async_pdo_pp_mode_init(&g_servo_node_2);
 
-    bsp_TIM_Base_Start_IT();
+    STEP_Motor_Init(&g_step_node);                       //电子夹辊步进电机初始化
 
     while (1)
     {
         /* 双路高频轮询看门狗与数据同步 */
         RS485_Poll(vfd);
         RS485_Poll(tpc);
-
+		
         /* 处理变频器响应 */
         App_Process_VFD_Response(vfd);
 

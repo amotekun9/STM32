@@ -11,6 +11,8 @@
 #include <stdbool.h>
 #include <string.h>
 #include "bsp_delay.h"
+#include <stdlib.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -75,6 +77,7 @@ typedef enum {
     OP_PROFILE_TOR  = 4,      /* 轮廓转矩模式 (TQ 模式) */
     OP_HOMING       = 6,      /* 回零模式 (HM 模式) */
     OP_INTERP_POS   = 7,      /* 插补位置模式 (IP 模式) */
+    OP_CSP_POS   	= 8,      /* 周期同步位置模式  */
 } OpMode_t;
 
 /**
@@ -99,6 +102,8 @@ typedef struct {
     int32_t         actual_vel;         /* 实际速度反馈 (0x606C) */
     int16_t         actual_tor;         /* 实际转矩反馈 (0x6077) */
 
+    int32_t  zero_offset;     /* 归零时的当前实际位置快照 */
+    uint8_t  is_zeroed;       /* 归零标志位 */
 } CIA402_Node_t;
 
 typedef CIA402_Node_t CAN_Step_Node_t;  //电子夹辊，步进电机专用
@@ -165,6 +170,8 @@ CO_Err_t CIA402_MapRxPDO1_OnlyControlword(CIA402_Node_t *node);
 CO_Err_t CANopen_SendRxPDO1_OnlyControlword(CIA402_Node_t *node, uint16_t ctrl_word);
 CO_Err_t CIA402_MapRxPDO1_ControlwordAndPos(CIA402_Node_t *node);
 CO_Err_t CANopen_SendRxPDO1_ControlwordAndPos(CIA402_Node_t *node, uint16_t ctrl_word, int32_t target_pos);
+CO_Err_t CIA402_MapRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node, uint16_t ctrl_word, uint8_t mode, int32_t target_vel);
 
 /* 1. TxPDO1 仅映射控制字 (0x6041, 16位) */
 CO_Err_t CIA402_MapTxPDO1_OnlyStatusword(CIA402_Node_t *node);

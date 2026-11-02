@@ -7,12 +7,14 @@ extern "C" {
 	
 #include "canopen.h"
 
-void canopen_selvage_nosave_async_pdo_init(CIA402_Node_t *node);
-void canopen_selvage_nosave_sync_pdo_init(CIA402_Node_t *node);
-void canopen_selvage_position_init(CIA402_Node_t *node);
+void canopen_selvage_nosave_async_pdo_pp_mode_init(CIA402_Node_t *node);
+void canopen_selvage_nosave_sync_pdo_pp_mode_init(CIA402_Node_t *node);
+void canopen_selvage_nosave_async_pdo_pv_mode_init(CIA402_Node_t *node);
+void canopen_selvage_nosave_sync_pdo_pv_mode_init(CIA402_Node_t *node);
+void canopen_selvage_pp_position_init(CIA402_Node_t *node);
 void canopen_selvage_speed_init(CIA402_Node_t *node);
-void selvage_sdo_jog_relative(CIA402_Node_t *node,int32_t target_pos); 
-void selvage_sdo_jog_relative(CIA402_Node_t *node,int32_t target_pos); 
+void canopen_selvage_nosave_csp_position_init(CIA402_Node_t *node);
+void selvage_sdo_jog(CIA402_Node_t *node,int32_t target_pos); 
 void selvage_pdo_jog_relative(CIA402_Node_t *node,int32_t target_pos); 
 
 #ifdef __cplusplus

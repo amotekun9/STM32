@@ -320,17 +320,17 @@ void CANopen_RecvHandler(CIA402_Node_t *node, const CanFrame_t *frame)
             break;
 
         case 0x280: /* TxPDO2: 实际速度 (0x606C) + 实际转矩 (0x6077) */
-            if (frame->data_len >= 4)
-            {
-                uint32_t vel_raw = (uint32_t)frame->data[0] | ((uint32_t)frame->data[1] << 8) |
-                                   ((uint32_t)frame->data[2] << 16) | ((uint32_t)frame->data[3] << 24);
-                node->actual_vel = (int32_t)vel_raw;
-            }
-            if (frame->data_len >= 6)
-            {
-                uint16_t tor_raw = (uint16_t)frame->data[4] | ((uint16_t)frame->data[5] << 8);
-                node->actual_tor = (int16_t)tor_raw;
-            }
+//            if (frame->data_len >= 4)
+//            {
+//                uint32_t vel_raw = (uint32_t)frame->data[0] | ((uint32_t)frame->data[1] << 8) |
+//                                   ((uint32_t)frame->data[2] << 16) | ((uint32_t)frame->data[3] << 24);
+//                node->actual_vel = (int32_t)vel_raw;
+//            }
+//            if (frame->data_len >= 6)
+//            {
+//                uint16_t tor_raw = (uint16_t)frame->data[4] | ((uint16_t)frame->data[5] << 8);
+//                node->actual_tor = (int16_t)tor_raw;
+//            }
             break;
 
         case 0x580: /* SDO 响应报文 (主站主动读写参数时的从站应答) */
@@ -664,6 +664,82 @@ CO_Err_t CANopen_SendRxPDO1_ControlwordAndPos(CIA402_Node_t *node, uint16_t ctrl
     return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
 }
 
+/**
+ * @brief  配置 RxPDO1 映射为复合对象：控制字 (0x6040) + 运行模式 (0x6060) + 目标速度 (0x60FF)
+ * @details 对应 7 字节 RxPDO1 帧：前 2 字节控制字，第 3 字节运行模式，后 4 字节目标速度
+ */
+CO_Err_t CIA402_MapRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x200 + node->node_id; /* RxPDO1 默认 COB-ID 基址 0x200 */
+
+    /* 1. 禁用 RxPDO1 (通信参数 0x1400 sub 01，Bit31 置 1) */
+    err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+	delay_ms(6);
+
+    /* 2. 清空当前映射表 (0x1600 sub 00 = 0) */
+    err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x00);
+    if (err != CO_OK) return err;
+	delay_ms(6);
+
+    /* 3. 写入第 1 个映射对象：0x6040 (控制字，16位 = 0x10) -> 0x60400010U */
+    err = CANopen_SDO_Write32(node, 0x1600, 0x01, 0x60400010U);
+    if (err != CO_OK) return err;
+	delay_ms(6);
+
+    /* 4. 写入第 2 个映射对象：0x6060 (运行模式，8位 = 0x08) -> 0x60600008U */
+    err = CANopen_SDO_Write32(node, 0x1600, 0x02, 0x60600008U);
+    if (err != CO_OK) return err;
+	delay_ms(6);
+
+    /* 5. 写入第 3 个映射对象：0x60FF (目标速度，32位 = 0x20) -> 0x60FF0020U */
+    err = CANopen_SDO_Write32(node, 0x1600, 0x03, 0x60FF0020U);
+    if (err != CO_OK) return err;
+	delay_ms(6);
+
+    /* 6. 设置映射个数为 3 (0x1600 sub 00 = 3) */
+    err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x03);
+    if (err != CO_OK) return err;
+	delay_ms(6);
+
+    /* 7. 重新使能 RxPDO1 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id);
+    if (err != CO_OK) return err;
+	delay_ms(6);
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO1 一次性下发控制字、运行模式与目标速度 (7 字节)
+ */
+CO_Err_t CANopen_SendRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node, uint16_t ctrl_word, uint8_t mode, int32_t target_vel)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x200 + node->node_id; /* RxPDO1 COB-ID: 0x200 + Node_ID */
+    frame.data_len = 7;                   /* 2字节控制字 + 1字节模式 + 4字节速度 = 7 字节 */
+
+    /* 1. 前 2 字节：控制字 (0x6040) */
+    frame.data[0] = (uint8_t)(ctrl_word & 0xFF);
+    frame.data[1] = (uint8_t)((ctrl_word >> 8) & 0xFF);
+
+    /* 2. 第 3 字节：运行模式 (0x6060) */
+    frame.data[2] = mode;
+
+    /* 3. 后 4 字节：目标速度 (0x60FF) */
+    frame.data[3] = (uint8_t)(target_vel & 0xFF);
+    frame.data[4] = (uint8_t)((target_vel >> 8) & 0xFF);
+    frame.data[5] = (uint8_t)((target_vel >> 16) & 0xFF);
+    frame.data[6] = (uint8_t)((target_vel >> 24) & 0xFF);
+
+    node->control_word = ctrl_word;
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
 
 /**
  * @brief  配置 TxPDO1 仅映射状态字 (0x6041, 16位)

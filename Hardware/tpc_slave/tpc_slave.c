@@ -30,6 +30,11 @@ extern uint16_t g_ctrl_cmd_reg = 0;
 extern CAN_Step_Node_t g_step_node;
 extern uint8_t g_drv_mode;
 extern uint8_t g_work_state;
+extern CIA402_Node_t g_servo_node_1,g_servo_node_2;
+extern volatile uint8_t g_left_edge_jog_fwd_flag;
+extern volatile uint8_t g_right_edge_fwd_flag;
+extern volatile uint8_t g_left_edge_jog_rev_flag;
+extern volatile uint8_t g_right_edge_rev_flag;
 
 // Modbus CRC16 ²é±í
 static const uint16_t crc16_table[] = {
@@ -292,29 +297,41 @@ void Modbus_CmdParse(void)
     // ========== ×ó²àµç×Ó½Ê±ß ==========
     if(cmd == CTRL_LEFT_EDGE_JOG_FWD)
     {
-        // LeftEdge_JogForward();
+        selvage_sdo_jog(&g_servo_node_1,800);
     }
     if(cmd == CTRL_LEFT_EDGE_JOG_REV)
     {
-        // LeftEdge_JogReverse();
+        selvage_sdo_jog(&g_servo_node_1,-800);
     }
     if(cmd == CTRL_LEFT_EDGE_HOME)//¹éÁã
     {
-        // LeftEdge_Home();
+    	g_servo_node_1.zero_offset = g_servo_node_1.actual_pos;
+//    	g_servo_node_1.zero_offset = abs((g_servo_node_1.actual_pos%36000)/100);
+//    	g_servo_node_1.zero_offset = g_servo_node_1.actual_pos;
+//		CANopen_SDO_Write32(&g_servo_node_1,0x607c,0,-g_servo_node_1.actual_pos);
+//		delay_ms(6);
+//		CANopen_SDO_Write16(&g_servo_node_1,0x2110,0,1);
     }
 
     // ========== ÓÒ²àµç×Ó½Ê±ß ==========
     if(cmd == CTRL_RIGHT_EDGE_JOG_FWD)
     {
-        // RightEdge_JogForward();
+        selvage_sdo_jog(&g_servo_node_2,800);
     }
     if(cmd == CTRL_RIGHT_EDGE_JOG_REV)
     {
-        // RightEdge_JogReverse();
+        selvage_sdo_jog(&g_servo_node_2,-800);
     }
     if(cmd == CTRL_RIGHT_EDGE_HOME) //¹éÁã
     {
-        // RightEdge_Home();
+    	g_servo_node_2.zero_offset = g_servo_node_2.actual_pos;
+//    	g_servo_node_2.zero_offset = abs((g_servo_node_2.actual_pos%36000)/100);
+//	    g_servo_node_2.zero_offset = g_servo_node_2.actual_pos;
+//		CANopen_SDO_Write16(&g_servo_node_2,0x2110,0,271);
+//		delay_ms(6);
+//		CANopen_SDO_Write16(&g_servo_node_2,0x2110,0,1);
+//		CANopen_SDO_Write32(&g_servo_node_2,0x607c,0,-g_servo_node_2.actual_pos);
+//		delay_ms(6);
     }
 
     // ========== µç×Ó¼ôµ¶ ==========
