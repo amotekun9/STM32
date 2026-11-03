@@ -17,7 +17,7 @@ void canopen_selvage_nosave_async_pdo_pp_mode_init(CIA402_Node_t *node)
         return;
 	CIA402_SetOpMode(node,OP_PROFILE_POS);
 	delay_ms(6);
-	CANopen_SDO_Write32(node, 0x6081, 0x00, 72000);
+	CANopen_SDO_Write32(node, 0x6081, 0x00,72000);
 	delay_ms(6);
 	CANopen_SDO_Write32(node, 0x6083, 0x00, 20);
 	delay_ms(6);
@@ -349,7 +349,7 @@ void Selvage_Callback(void)
 		/*Î»ÖÃ¸úËæÄ£Ê½*/
 		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_1,0x000f,(int32_t)selvage_delta);
 		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_2,0x000f,(int32_t)selvage_delta);
-		delay_ms(2);
+//		delay_ms(2);
 		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_1,0x005f,(int32_t)selvage_delta);
 		CANopen_SendRxPDO1_ControlwordAndPos(&g_servo_node_2,0x005f,(int32_t)selvage_delta);
 
@@ -412,8 +412,12 @@ void Selvage_Callback(void)
 	}
 	g_upload_data.left_edge_pos_up = left_pos;
 	g_upload_data.right_edge_pos_up = right_pos;
-
-//	printf("enc_now=%d,enc_angle=%d,enc_delta=%d,selvage_delta=%d,encoder_rpm=%d\n\n",enc_now,g_upload_data.encoder_angle_up,enc_delta,selvage_delta,encoder_rpm);
+	int32_t dev_angle = encoder_angle - g_upload_data.left_edge_pos_up;
+	if ( dev_angle < 0)
+	{
+		dev_angle += 360;
+	}
+//	printf("enc_now=%d,enc_angle=%d,selvage_angle=%d,dev_angle=%d,enc_delta=%d,selvage_delta=%d,encoder_rpm=%d\n\n",enc_now,encoder_angle,g_upload_data.left_edge_pos_up,dev_angle,enc_delta,selvage_delta,encoder_rpm);
 }
 
 

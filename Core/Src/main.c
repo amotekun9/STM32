@@ -99,6 +99,7 @@ int main(void)
   MX_USART3_UART_Init();
   MX_TIM4_Init();
   MX_TIM7_Init();
+  MX_TIM5_Init();
 
   /* Initialize interrupts */
   MX_NVIC_Init();
@@ -163,25 +164,25 @@ void SystemClock_Config(void)
 static void MX_NVIC_Init(void)
 {
   /* USB_LP_CAN1_RX0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(USB_LP_CAN1_RX0_IRQn, 7, 0);
   HAL_NVIC_EnableIRQ(USB_LP_CAN1_RX0_IRQn);
   /* CAN1_SCE_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(CAN1_SCE_IRQn, 2, 0);
+  HAL_NVIC_SetPriority(CAN1_SCE_IRQn, 8, 0);
   HAL_NVIC_EnableIRQ(CAN1_SCE_IRQn);
   /* USART2_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(USART2_IRQn, 3, 0);
+  HAL_NVIC_SetPriority(USART2_IRQn, 11, 0);
   HAL_NVIC_EnableIRQ(USART2_IRQn);
   /* USART3_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(USART3_IRQn, 0, 0);
+  HAL_NVIC_SetPriority(USART3_IRQn, 10, 0);
   HAL_NVIC_EnableIRQ(USART3_IRQn);
   /* DMA1_Channel7_IRQn interrupt configuration */
   HAL_NVIC_SetPriority(DMA1_Channel7_IRQn, 4, 0);
   HAL_NVIC_EnableIRQ(DMA1_Channel7_IRQn);
   /* TIM6_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(TIM6_IRQn, 6, 0);
+  HAL_NVIC_SetPriority(TIM6_IRQn, 4, 0);
   HAL_NVIC_EnableIRQ(TIM6_IRQn);
   /* TIM7_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(TIM7_IRQn, 5, 0);
+  HAL_NVIC_SetPriority(TIM7_IRQn, 3, 0);
   HAL_NVIC_EnableIRQ(TIM7_IRQn);
 }
 

@@ -24,6 +24,34 @@ static CIA402_Node_t *g_node_registry[MAX_CANOPEN_NODES] = {NULL};
  * @param  data:     待写入的 32 位有效数据
  * @return CO_Err_t: CO_OK=成功, CO_ERROR_PARAM=参数错, CO_ERROR_HW=硬件发送错
  */
+//static CO_Err_t SDO_SendFrame(CIA402_Node_t *node, uint8_t cmd, uint16_t index, uint8_t subindex, uint32_t data)
+//{
+//    if (!node)
+//    {
+//        return CO_ERROR_PARAM;
+//    }
+//
+//    CanFrame_t frame;
+//    /* SDO 请求 COB-ID = 0x600 + Node_ID */
+//    frame.cob_id = COB_ID_SDO_TX_BASE + node->node_id;
+//    frame.data_len = 8; /* SDO 标准固定为 8 字节 */
+//    
+//    /* 组装 SDO 报文格式：[Command] [Index Low] [Index High] [SubIndex] [Data 4Bytes] */
+//    frame.data[0] = cmd;
+//    frame.data[1] = LSB(index);
+//    frame.data[2] = MSB(index);
+//    frame.data[3] = subindex;
+//    
+//    /* 小端模式：低字节在前，高字节在后 */
+//    frame.data[4] = (uint8_t)(data & 0xFF);
+//    frame.data[5] = (uint8_t)((data >> 8) & 0xFF);
+//    frame.data[6] = (uint8_t)((data >> 16) & 0xFF);
+//    frame.data[7] = (uint8_t)((data >> 24) & 0xFF);
+//
+//    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+//}
+
+/* ----------------   SDO发送的底层不放入发送队列中断发送 ---------------------*/
 static CO_Err_t SDO_SendFrame(CIA402_Node_t *node, uint8_t cmd, uint16_t index, uint8_t subindex, uint32_t data)
 {
     if (!node)
@@ -48,7 +76,7 @@ static CO_Err_t SDO_SendFrame(CIA402_Node_t *node, uint8_t cmd, uint16_t index, 
     frame.data[6] = (uint8_t)((data >> 16) & 0xFF);
     frame.data[7] = (uint8_t)((data >> 24) & 0xFF);
 
-    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+    return CAN_HW_Send(&frame) ? CO_OK : CO_ERROR_HW;
 }
 
 /**
@@ -936,6 +964,7 @@ CO_Err_t CIA402_MapRxPDO3_OnlyPos(CIA402_Node_t *node)
     /* 4. 设置映射个数为 1 */
     err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x01);
     if (err != CO_OK) return err;
+
 	delay_ms(6);
 
     /* 5. 重新使能 RxPDO3 */
@@ -945,7 +974,6 @@ CO_Err_t CIA402_MapRxPDO3_OnlyPos(CIA402_Node_t *node)
 
     return CO_OK;
 }
-
 CO_Err_t CANopen_SendRxPDO3_OnlyPos(CIA402_Node_t *node, int32_t target_pos)
 {
     if (!node) return CO_ERROR_PARAM;

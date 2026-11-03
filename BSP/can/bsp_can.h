@@ -14,16 +14,15 @@ extern "C" {
 
 /* 引用 CiA402 协议栈头文件，使用 CanFrame_t 和 CIA402_Node_t */
 
-#define CAN_RX_BUF_SIZE 128 /* 接收环形队列长度，需为 2 的幂（16/32/64） */
+/* ==================== 缓冲区配置 ==================== */
+#define CAN_RX_BUF_SIZE     128U    /* 接收环形队列长度 */
+#define CAN_TX_BUF_SIZE     128U     /* 发送环形队列长度，需为 2 的幂 */
+
 
 extern CAN_HandleTypeDef hcan; /* CAN 硬件句柄（CubeMX 生成） */
 
-/* CAN 接收环形队列结构（SPSC：中断写 head，主循环读 tail） */
-typedef struct {
-    CanFrame_t buffer[CAN_RX_BUF_SIZE];
-    volatile uint16_t head; /* 写指针（中断维护） */
-    volatile uint16_t tail; /* 读指针（主循环维护） */
-} CAN_RxRingBuf_t;
+bool CAN_HW_Send(const CanFrame_t *frame);
+
 
 /**
  * @brief  初始化并使能 CAN 外设及接收中断（默认全通滤波器，接收全部标准/扩展帧）
@@ -48,6 +47,12 @@ bool CAN_SendFrame(const CanFrame_t *frame);
 bool BSP_CAN_ReadFrame(CanFrame_t *out_frame);
 
 /**
+ * @brief  发送队列调度：5ms 定时器中断中调用
+ * @note   每次中断遍历发送队列，对每个从机最多发送一帧
+ */
+void CAN_TX_Process(void);
+
+/**
  * @brief  为单个从站节点配置硬件滤波器（可选，替代默认全通）
  * @param  node_id:    从站节点 ID（1~127）
  * @param  start_bank: 起始滤波器组号（STM32F1 共 14 组，每节点占用 5 组）
@@ -57,6 +62,11 @@ bool BSP_CAN_ReadFrame(CanFrame_t *out_frame);
  *         仅接收标准帧（IDE=0），屏蔽扩展帧，可显著降低无关中断负载
  */
 bool BSP_CAN_ConfigNodeFilters(uint8_t node_id, uint8_t start_bank);
+
+/**
+ * @brief  获取发送队列中待发送帧数（调试用）
+ */
+uint16_t CAN_TX_GetPendingCount(void);
 
 #ifdef __cplusplus
 }

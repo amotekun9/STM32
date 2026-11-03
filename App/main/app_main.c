@@ -7,7 +7,7 @@ extern int16_t delta;
 void app_main(void)
 {
     delay_init(72);                           //加载保存参数
-    delay_ms(1000);
+    delay_ms(4000);
     RS485_All_Init();
     RS485_Dev_t *vfd = RS485_GetDevice(&RS485_HANDLE); 
     RS485_Dev_t *tpc = RS485_GetDevice(&MAX485_HANDLE);
@@ -18,6 +18,7 @@ void app_main(void)
 	CIA402_InitAndRegisterNode(&g_servo_node_1, 1);
     CIA402_InitAndRegisterNode(&g_servo_node_2, 2);
     CIA402_InitAndRegisterNode(&g_step_node, 3);
+	bsp_TIM5_Base_Start_IT();
 	canopen_selvage_nosave_async_pdo_pp_mode_init(&g_servo_node_1);
 	canopen_selvage_nosave_async_pdo_pp_mode_init(&g_servo_node_2);
     bsp_TIM6_Base_Start_IT();
@@ -39,7 +40,7 @@ void app_main(void)
         modbus_slave_task();  //单片机modbus从机任务，必须不断轮询，处理主机请求;
         ModbusHolding_RefreshUpload();// 业务数据写入保持寄存器
         Modbus_CmdParse();            // 解析触摸屏下发的控制bit指令
-
+        
         /* 处理电子夹纱器请求 */
         Pinch_Motor_task(); //夹持电机任务，必须不断轮询，处理主机请求; 
         
