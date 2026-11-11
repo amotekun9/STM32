@@ -47,7 +47,7 @@ static uint8_t CAN_GetNodeIDFromCOBID(uint32_t cob_id)
 bool BSP_CAN_Start(void)
 {
      /* 初始化接收队列 */
-    RingBuffer_Init(&g_can_rx_queue, g_can_rx_pool, CAN_RX_BUF_SIZE, sizeof(CanFrame_t));
+//    RingBuffer_Init(&g_can_rx_queue, g_can_rx_pool, CAN_RX_BUF_SIZE, sizeof(CanFrame_t));
 
     /* 初始化发送队列 */
     RingBuffer_Init(&g_can_tx_queue, g_can_tx_pool, CAN_TX_BUF_SIZE, sizeof(CanFrame_t));
@@ -86,11 +86,33 @@ bool BSP_CAN_Start(void)
 }
 
 /**
+ * @brief  带超时与重试机制的 CAN 初始化封装函数
+ * @param  timeout_ms: 总超时时间（单位：毫秒）
+ * @return true: 初始化成功, false: 超时失败
+ */
+bool BSP_CAN_Init_WithTimeout(uint32_t timeout_ms)
+{
+    uint32_t start_tick = HAL_GetTick();
+
+    // 在指定超时时间内循环尝试启动
+    while ((HAL_GetTick() - start_tick) < timeout_ms)
+    {
+        if (BSP_CAN_Start())
+        {
+            return true; // 启动成功，立即返回
+        }
+        
+        HAL_Delay(100); // 失败后间隔 100ms 再试，给收发器上电稳定时间
+    }
+
+    return false; // 超时仍未成功
+}
+
+/**
  * @brief  底层硬件发送：组装 TxHeader 并调用 HAL
  * @return true=成功，false=邮箱满
  */
 bool CAN_HW_Send(const CanFrame_t *frame)
-
 {
     if (frame == NULL)
     {
@@ -116,6 +138,8 @@ bool CAN_HW_Send(const CanFrame_t *frame)
 	        return false;
 	    }
 	}
+
+//	while (HAL_CAN_GetTxMailboxesFreeLevel(&hcan) == 0);	//死等，必须发出去
 
     return (HAL_CAN_AddTxMessage(&hcan, &tx_header, (uint8_t *)frame->data, &tx_mailbox) == HAL_OK);
 }
@@ -179,7 +203,7 @@ bool BSP_CAN_ReadFrame(CanFrame_t *out_frame)
 }
 
 /**
- * @brief  发送队列调度函数 —— 必须在 5ms 定时器中断中调用
+ * @brief  发送队列调度函数 —— 必须在定时器中断中调用
  * @note   每次中断：
  *         1. 清空本周期节点发送标记；
  *         2. 遍历发送队列，对每个节点最多发送一帧；
@@ -189,41 +213,39 @@ bool BSP_CAN_ReadFrame(CanFrame_t *out_frame)
 void CAN_TX_Process(void)
 {
     CanFrame_t frame;
-    uint16_t   checked = 0U;
 
-    /* 防止极端情况下死循环：最多检查整个队列长度 */
-    const uint16_t max_check = CAN_TX_BUF_SIZE;
+    /* ★ 关键：获取当前队列中的帧数，本次只处理这么多 */
+    uint16_t total = RingBuffer_GetCount(&g_can_tx_queue);
+    if (total == 0U) return;
 
     /* 清零本周期发送标记 */
     memset(g_node_sent_flag, 0, sizeof(g_node_sent_flag));
 
-    while ((checked < max_check) && !RingBuffer_IsEmpty(&g_can_tx_queue)) {
+    for (uint16_t i = 0U; i < total; i++) {
         if (!RingBuffer_Pop(&g_can_tx_queue, &frame)) {
             break;
         }
-        checked++;
 
         uint8_t node_id = CAN_GetNodeIDFromCOBID(frame.cob_id);
 
-        /* ---------- 广播帧 / 无节点帧：直接尝试发送 ---------- */
+        /* ---------- 广播帧：直接发送 ---------- */
         if (node_id == 0U) {
             if (!CAN_HW_Send(&frame)) {
-                /* 邮箱满：重新入队，等下一个周期 */
                 RingBuffer_Push(&g_can_tx_queue, &frame);
             }
             continue;
         }
 
-        /* ---------- 节点帧：检查本周期是否已发送过 ---------- */
+        /* ---------- 节点帧：每节点每周期只发一帧 ---------- */
         if (!g_node_sent_flag[node_id]) {
             if (CAN_HW_Send(&frame)) {
-                g_node_sent_flag[node_id] = true;   /* 标记该节点本周期已发送 */
+                g_node_sent_flag[node_id] = true;
             } else {
-                /* 邮箱满：重新入队 */
+                /* 邮箱满：放回队尾 */
                 RingBuffer_Push(&g_can_tx_queue, &frame);
             }
         } else {
-            /* 该节点本周期已发过一帧，重新入队等下一个 5ms */
+            /* 该节点本周期已发过：放回队尾，等下一个 5ms */
             RingBuffer_Push(&g_can_tx_queue, &frame);
         }
     }
@@ -290,6 +312,28 @@ bool BSP_CAN_ConfigNodeFilters(uint8_t node_id, uint8_t start_bank)
 }
 
 /* ==================== 中断回调（ISR 内只做最轻量的事） ==================== */
+void HAL_CAN_ErrorCallback(CAN_HandleTypeDef *hcan)
+{
+    if (hcan->Instance == CAN1)
+    {
+        uint32_t error_code = HAL_CAN_GetError(hcan);
+
+        // 检查是否发生了 Bus-Off（总线关闭）或其他严重错误
+        if (error_code & HAL_CAN_ERROR_BOF) 
+        {
+            // 局部重启 CAN 的标准流程：
+            HAL_CAN_Stop(hcan);
+            
+            // 重新初始化 CAN 寄存器
+            if (HAL_CAN_Init(hcan) == HAL_OK)
+            {
+                HAL_CAN_Start(hcan);
+                // 重新开启接收和发送中断通知
+                HAL_CAN_ActivateNotification(hcan, CAN_IT_RX_FIFO0_MSG_PENDING | CAN_IT_TX_MAILBOX_EMPTY);
+            }
+        }
+    }
+}
 
 /**
  * @brief CAN 接收 FIFO0 中断回调：仅入队，不处理协议
@@ -323,3 +367,46 @@ void HAL_CAN_RxFifo0MsgPendingCallback(CAN_HandleTypeDef *hcan_ptr)
     /* 使用通用环形缓冲区压入接口写入数据 */
     RingBuffer_Push(&g_can_rx_queue, &frame);
 }
+
+/**
+ * @brief  统一的 CAN 发送成功处理函数
+ * @param  hcan: CAN 句柄
+ * @param  mailbox_id: 哪个邮箱发送成功（0, 1, 2）
+ */
+static void App_CAN_TxComplete_Handler(CAN_HandleTypeDef *hcan, uint8_t mailbox_id)
+{
+	static uint32_t send_int_cnt = 0;
+    if (hcan->Instance == CAN1)
+    {
+        // TODO: 在这里编写你统一的发送成功逻辑
+        // 例如：累加发送成功计数器、清除对应状态标志、或者通知 RTOS 任务
+	     send_int_cnt++;
+		 printf("send_int_cnt = %d\r\n", send_int_cnt);
+//         printf("Mailbox %d send success!\r\n", mailbox_id);
+    }
+}
+
+/**
+ * @brief  STM32 原生弱定义回调函数：邮箱 0 发送完成
+ */
+void HAL_CAN_TxMailbox0CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+    App_CAN_TxComplete_Handler(hcan, 0);
+}
+
+/**
+ * @brief  STM32 原生弱定义回调函数：邮箱 1 发送完成
+ */
+void HAL_CAN_TxMailbox1CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+    App_CAN_TxComplete_Handler(hcan, 1);
+}
+
+/**
+ * @brief  STM32 原生弱定义回调函数：邮箱 2 发送完成
+ */
+void HAL_CAN_TxMailbox2CompleteCallback(CAN_HandleTypeDef *hcan)
+{
+    App_CAN_TxComplete_Handler(hcan, 2);
+}
+

@@ -11,12 +11,13 @@ extern "C" {
 #include <string.h>
 #include "canopen.h"
 #include "ring_buffer.h"
+#include "bsp_usart.h"
 
 /* 引用 CiA402 协议栈头文件，使用 CanFrame_t 和 CIA402_Node_t */
 
 /* ==================== 缓冲区配置 ==================== */
-#define CAN_RX_BUF_SIZE     128U    /* 接收环形队列长度 */
-#define CAN_TX_BUF_SIZE     128U     /* 发送环形队列长度，需为 2 的幂 */
+#define CAN_RX_BUF_SIZE     512U    /* 接收环形队列长度 */
+#define CAN_TX_BUF_SIZE     512U     /* 发送环形队列长度，需为 2 的幂 */
 
 
 extern CAN_HandleTypeDef hcan; /* CAN 硬件句柄（CubeMX 生成） */
@@ -30,6 +31,8 @@ bool CAN_HW_Send(const CanFrame_t *frame);
  * @note   如需硬件过滤收紧，调用后在主循环调用 BSP_CAN_ConfigNodeFilters() 覆盖
  */
 bool BSP_CAN_Start(void);
+
+bool BSP_CAN_Init_WithTimeout(uint32_t timeout_ms);
 
 /**
  * @brief  发送一帧 CAN 报文（CANopen 协议栈底层发送接口，带 Tx 邮箱保护）

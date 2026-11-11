@@ -115,6 +115,8 @@ typedef CIA402_Node_t CAN_Step_Node_t;  //电子夹辊，步进电机专用
  * @return true=发送成功, false=发送失败/邮箱满
  */
 extern bool CAN_SendFrame(const CanFrame_t *frame);
+extern bool CAN_HW_Send(const CanFrame_t *frame);
+
 extern bool BSP_CAN_ReadFrame(CanFrame_t *out_frame);
 /************************ 核心 API 函数声明 ************************/
 
@@ -172,6 +174,10 @@ CO_Err_t CIA402_MapRxPDO1_ControlwordAndPos(CIA402_Node_t *node);
 CO_Err_t CANopen_SendRxPDO1_ControlwordAndPos(CIA402_Node_t *node, uint16_t ctrl_word, int32_t target_pos);
 CO_Err_t CIA402_MapRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node);
 CO_Err_t CANopen_SendRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node, uint16_t ctrl_word, uint8_t mode, int32_t target_vel);
+CO_Err_t CIA402_MapRxPDO1_TargetPosAndProfileVel(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO1_TargetPosAndProfileVel(CIA402_Node_t *node, int32_t target_pos, uint32_t profile_vel);
+CO_Err_t CIA402_MapRxPDO1_ControlwordAndProfileVel(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO1_ControlwordAndProfileVel(CIA402_Node_t *node, uint16_t ctrl_word, uint32_t profile_vel);
 
 /* 1. TxPDO1 仅映射控制字 (0x6041, 16位) */
 CO_Err_t CIA402_MapTxPDO1_OnlyStatusword(CIA402_Node_t *node);
@@ -180,12 +186,23 @@ CO_Err_t CIA402_MapTxPDO1_StatuswordAndActualPos(CIA402_Node_t *node);
 /* 2. RxPDO2 仅映射运行模式 (0x6060, 8位) */
 CO_Err_t CIA402_MapRxPDO2_OnlyMode(CIA402_Node_t *node);
 CO_Err_t CANopen_SendRxPDO2_OnlyMode(CIA402_Node_t *node, uint8_t mode);
+CO_Err_t CIA402_MapRxPDO2_ProfileAccelAndDecel(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO2_ProfileAccelAndDecel(CIA402_Node_t *node, uint32_t profile_acc, uint32_t profile_dec);
+CO_Err_t CIA402_MapRxPDO2_OnlyProfileVel(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO2_OnlyProfileVel(CIA402_Node_t *node, uint32_t profile_vel);
+
 /* 2. TxPDO2 仅映射运行模式 (0x6064, 8位) */
 CO_Err_t CIA402_MapTxPDO2_OnlyActualPos(CIA402_Node_t *node);
 
 /* 3. RxPDO3 仅映射目标位置 (0x607A, 32位) */
 CO_Err_t CIA402_MapRxPDO3_OnlyPos(CIA402_Node_t *node);
 CO_Err_t CANopen_SendRxPDO3_OnlyPos(CIA402_Node_t *node, int32_t target_pos);
+CO_Err_t CIA402_MapRxPDO3_OnlyControlword(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO3_OnlyControlword(CIA402_Node_t *node, uint16_t ctrl_word);
+CO_Err_t CIA402_MapRxPDO3_OnlyTargetPos(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO3_OnlyTargetPos(CIA402_Node_t *node, int32_t target_pos);
+CO_Err_t CIA402_MapRxPDO3_ProfileAccelAndDecel(CIA402_Node_t *node);
+CO_Err_t CANopen_SendRxPDO3_ProfileAccelAndDecel(CIA402_Node_t *node, uint32_t profile_acc, uint32_t profile_dec);
 
 /* 4. RxPDO4 仅映射目标速度 (0x60FF, 32位) */
 CO_Err_t CIA402_MapRxPDO4_OnlyVel(CIA402_Node_t *node);

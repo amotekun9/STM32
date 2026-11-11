@@ -78,31 +78,38 @@ static int8_t bsp_flash_write(uint32_t addr, uint8_t *p_data, uint16_t len)
  */
 void upload_param_load(void)
 {
-    SaveParam_t temp;
-    // 读取Flash里保存的参数
-    bsp_flash_read(PARAM_STORE_ADDR, (uint8_t *)&temp, sizeof(SaveParam_t));
+	SaveParam_t temp;
+	// 读取Flash里保存的参数
+	bsp_flash_read(PARAM_STORE_ADDR, (uint8_t *)&temp, sizeof(SaveParam_t));
 
-    // 判断：三个参数全是0xFFFF代表Flash空白，使用默认值
-    if(temp.weft_density_up == 0xFFFFU && temp.cut_star_angle_up == 0xFFFFU && temp.cut_return_angle_up == 0xFFFFU)
-    {
-        g_upload_data.weft_density_up      = 800U;
-        g_upload_data.cut_star_angle_up    = 100U;
-        g_upload_data.cut_return_angle_up  = 200U;
-        // upload_param_save(); // 打开注释：首次上电自动把默认值写入Flash，只写一次
-    }
-    else
-    {
-        // Flash内有有效参数，直接加载
-        g_upload_data.weft_density_up      = temp.weft_density_up;
-        g_upload_data.cut_star_angle_up    = temp.cut_star_angle_up;
-        g_upload_data.cut_return_angle_up  = temp.cut_return_angle_up;
-    }
+	// 判断：三个参数全是0xFFFF代表Flash空白，使用默认值
+	if(temp.weft_density_up == 0xFFFFU && temp.cut_star_angle_up == 0xFFFFU && temp.cut_return_angle_up == 0xFFFFU)
+	{
+		g_upload_data.weft_density_up	   = 800U;
+		g_upload_data.cut_star_angle_up    = 100U;
+		g_upload_data.cut_return_angle_up  = 200U;
+		g_upload_data.left_edge_angle_up   = 250U;
+		g_upload_data.right_edge_angle_up  = 250U;
+		// upload_param_save(); // 打开注释：首次上电自动把默认值写入Flash，只写一次
+	}
+	else
+	{
+		// Flash内有有效参数，直接加载
+		g_upload_data.weft_density_up	   = temp.weft_density_up;
+		g_upload_data.cut_star_angle_up    = temp.cut_star_angle_up;
+		g_upload_data.cut_return_angle_up  = temp.cut_return_angle_up;
+		g_upload_data.left_edge_angle_up   = temp.left_edge_angle_up;
+		g_upload_data.right_edge_angle_up  = temp.right_edge_angle_up;
+	}
 
-    // 同步到Modbus holding寄存器，触摸屏刷新显示
-    modbus_holding_reg[1] = g_upload_data.weft_density_up;
-    modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;
-    modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;
+	// 同步到Modbus holding寄存器，触摸屏刷新显示
+	modbus_holding_reg[1] = g_upload_data.weft_density_up;
+	modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;
+	modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;
+	modbus_holding_reg[8] = g_upload_data.left_edge_angle_up;
+	modbus_holding_reg[9] = g_upload_data.right_edge_angle_up;		
 }
+
 
 /**
  * @brief  参数保存：将当前UploadData_t里的工艺参数写入Flash
@@ -110,13 +117,16 @@ void upload_param_load(void)
  */
 void upload_param_save(void)
 {
-    SaveParam_t buf;
-    // 从上传结构体取出当前参数
-    buf.weft_density_up      = g_upload_data.weft_density_up;
-    buf.cut_star_angle_up    = g_upload_data.cut_star_angle_up;
-    buf.cut_return_angle_up  = g_upload_data.cut_return_angle_up;
-
-    // 写入Flash
-    bsp_flash_write(PARAM_STORE_ADDR, (uint8_t *)&buf, sizeof(SaveParam_t));
+	SaveParam_t buf;
+	// 从上传结构体取出当前参数
+	buf.weft_density_up 	 = g_upload_data.weft_density_up;
+	buf.cut_star_angle_up	 = g_upload_data.cut_star_angle_up;
+	buf.cut_return_angle_up  = g_upload_data.cut_return_angle_up;
+	buf.left_edge_angle_up	 = g_upload_data.left_edge_angle_up;
+	buf.right_edge_angle_up  = g_upload_data.right_edge_angle_up;
+	
+	// 写入Flash
+	bsp_flash_write(PARAM_STORE_ADDR, (uint8_t *)&buf, sizeof(SaveParam_t));
 }
+
 

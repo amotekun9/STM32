@@ -5,7 +5,7 @@
  */
 
 #include "canopen.h"
-
+#include "selvage_driver.h"
 /* 字节提取宏定义 (小端模式拆分) */
 #define LSB(x)      ((uint8_t)((x) & 0xFF))         /* 获取 16 位数据的低字节 */
 #define MSB(x)      ((uint8_t)(((x) >> 8) & 0xFF))    /* 获取 16 位数据的高字节 */
@@ -24,34 +24,6 @@ static CIA402_Node_t *g_node_registry[MAX_CANOPEN_NODES] = {NULL};
  * @param  data:     待写入的 32 位有效数据
  * @return CO_Err_t: CO_OK=成功, CO_ERROR_PARAM=参数错, CO_ERROR_HW=硬件发送错
  */
-//static CO_Err_t SDO_SendFrame(CIA402_Node_t *node, uint8_t cmd, uint16_t index, uint8_t subindex, uint32_t data)
-//{
-//    if (!node)
-//    {
-//        return CO_ERROR_PARAM;
-//    }
-//
-//    CanFrame_t frame;
-//    /* SDO 请求 COB-ID = 0x600 + Node_ID */
-//    frame.cob_id = COB_ID_SDO_TX_BASE + node->node_id;
-//    frame.data_len = 8; /* SDO 标准固定为 8 字节 */
-//    
-//    /* 组装 SDO 报文格式：[Command] [Index Low] [Index High] [SubIndex] [Data 4Bytes] */
-//    frame.data[0] = cmd;
-//    frame.data[1] = LSB(index);
-//    frame.data[2] = MSB(index);
-//    frame.data[3] = subindex;
-//    
-//    /* 小端模式：低字节在前，高字节在后 */
-//    frame.data[4] = (uint8_t)(data & 0xFF);
-//    frame.data[5] = (uint8_t)((data >> 8) & 0xFF);
-//    frame.data[6] = (uint8_t)((data >> 16) & 0xFF);
-//    frame.data[7] = (uint8_t)((data >> 24) & 0xFF);
-//
-//    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
-//}
-
-/* ----------------   SDO发送的底层不放入发送队列中断发送 ---------------------*/
 static CO_Err_t SDO_SendFrame(CIA402_Node_t *node, uint8_t cmd, uint16_t index, uint8_t subindex, uint32_t data)
 {
     if (!node)
@@ -76,8 +48,36 @@ static CO_Err_t SDO_SendFrame(CIA402_Node_t *node, uint8_t cmd, uint16_t index, 
     frame.data[6] = (uint8_t)((data >> 16) & 0xFF);
     frame.data[7] = (uint8_t)((data >> 24) & 0xFF);
 
-    return CAN_HW_Send(&frame) ? CO_OK : CO_ERROR_HW;
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
 }
+
+/* ----------------   SDO发送的底层不放入发送队列中断发送 ---------------------*/
+//static CO_Err_t SDO_SendFrame(CIA402_Node_t *node, uint8_t cmd, uint16_t index, uint8_t subindex, uint32_t data)
+//{
+//    if (!node)
+//    {
+//        return CO_ERROR_PARAM;
+//    }
+//
+//    CanFrame_t frame;
+//    /* SDO 请求 COB-ID = 0x600 + Node_ID */
+//    frame.cob_id = COB_ID_SDO_TX_BASE + node->node_id;
+//    frame.data_len = 8; /* SDO 标准固定为 8 字节 */
+//    
+//    /* 组装 SDO 报文格式：[Command] [Index Low] [Index High] [SubIndex] [Data 4Bytes] */
+//    frame.data[0] = cmd;
+//    frame.data[1] = LSB(index);
+//    frame.data[2] = MSB(index);
+//    frame.data[3] = subindex;
+//    
+//    /* 小端模式：低字节在前，高字节在后 */
+//    frame.data[4] = (uint8_t)(data & 0xFF);
+//    frame.data[5] = (uint8_t)((data >> 8) & 0xFF);
+//    frame.data[6] = (uint8_t)((data >> 16) & 0xFF);
+//    frame.data[7] = (uint8_t)((data >> 24) & 0xFF);
+//
+//    return CAN_HW_Send(&frame) ? CO_OK : CO_ERROR_HW;
+//}
 
 /**
  * @brief 注册一个 CANopen 节点到总线管理系统
@@ -344,6 +344,8 @@ void CANopen_RecvHandler(CIA402_Node_t *node, const CanFrame_t *frame)
                 uint32_t pos_raw = (uint32_t)frame->data[2] | ((uint32_t)frame->data[3] << 8) |
                                    ((uint32_t)frame->data[4] << 16) | ((uint32_t)frame->data[5] << 24);
                 node->actual_pos = (int32_t)pos_raw;
+				
+				upload_selvage_angle();
             }
             break;
 
@@ -592,27 +594,27 @@ CO_Err_t CIA402_MapRxPDO1_OnlyControlword(CIA402_Node_t *node)
     /* 1. 禁用 RxPDO1 (0x1400 sub 01) */
     err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 2. 清空映射表 (0x1600 sub 00 = 0) */
     err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入 0x6040 (16位 = 0x10) -> 0x60400010U */
     err = CANopen_SDO_Write32(node, 0x1600, 0x01, 0x60400010U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 设置映射个数为 1 */
     err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x01);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 5. 重新使能 RxPDO1 */
     err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }
@@ -643,7 +645,7 @@ CO_Err_t CIA402_MapRxPDO1_ControlwordAndPos(CIA402_Node_t *node)
     /* 1. 禁用 RxPDO1 (通信参数 0x1400 sub 01，Bit31 置 1) */
     err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+		delay_ms(6);
     /* 2. 清空当前映射表 (0x1600 sub 00 = 0) */
     err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x00);
     if (err != CO_OK) return err;
@@ -706,37 +708,37 @@ CO_Err_t CIA402_MapRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node)
     /* 1. 禁用 RxPDO1 (通信参数 0x1400 sub 01，Bit31 置 1) */
     err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 2. 清空当前映射表 (0x1600 sub 00 = 0) */
     err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入第 1 个映射对象：0x6040 (控制字，16位 = 0x10) -> 0x60400010U */
     err = CANopen_SDO_Write32(node, 0x1600, 0x01, 0x60400010U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 写入第 2 个映射对象：0x6060 (运行模式，8位 = 0x08) -> 0x60600008U */
     err = CANopen_SDO_Write32(node, 0x1600, 0x02, 0x60600008U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 5. 写入第 3 个映射对象：0x60FF (目标速度，32位 = 0x20) -> 0x60FF0020U */
     err = CANopen_SDO_Write32(node, 0x1600, 0x03, 0x60FF0020U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 6. 设置映射个数为 3 (0x1600 sub 00 = 3) */
     err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x03);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 7. 重新使能 RxPDO1 (写入正常的 COB-ID，Bit 31 清 0) */
     err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }
@@ -770,6 +772,139 @@ CO_Err_t CANopen_SendRxPDO1_ControlwordModeAndVel(CIA402_Node_t *node, uint16_t 
 }
 
 /**
+ * @brief  配置 RxPDO1 映射为复合对象：目标位置 (0x607A) + 轮廓速度 (0x6081)
+ * @details 对应 8 字节满帧 RxPDO1：前 4 字节目标位置，后 4 字节轮廓速度
+ */
+CO_Err_t CIA402_MapRxPDO1_TargetPosAndProfileVel(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x200 + node->node_id; /* RxPDO1 默认 COB-ID 基址 0x200 */
+
+    /* 1. 禁用 RxPDO1 (通信参数 0x1400 sub 01，Bit31 置 1) */
+    err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+	
+
+    /* 2. 清空当前映射表 (0x1600 sub 00 = 0) */
+    err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x00);
+    if (err != CO_OK) return err;
+	
+
+    /* 3. 写入第 1 个映射对象：0x607A (目标位置，32位 = 0x20) -> 0x607A0020U */
+    err = CANopen_SDO_Write32(node, 0x1600, 0x01, 0x607A0020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 4. 写入第 2 个映射对象：0x6081 (轮廓速度，32位 = 0x20) -> 0x60810020U */
+    err = CANopen_SDO_Write32(node, 0x1600, 0x02, 0x60810020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 5. 设置映射个数为 2 (0x1600 sub 00 = 2) */
+    err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x02);
+    if (err != CO_OK) return err;
+	
+
+    /* 6. 重新使能 RxPDO1 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id);
+    if (err != CO_OK) return err;
+	
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO1 一次性下发目标位置与轮廓速度 (8 字节)
+ */
+CO_Err_t CANopen_SendRxPDO1_TargetPosAndProfileVel(CIA402_Node_t *node, int32_t target_pos, uint32_t profile_vel)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x200 + node->node_id; /* RxPDO1 COB-ID: 0x200 + Node_ID */
+    frame.data_len = 8;                   /* 前4字节目标位置 + 后4字节轮廓速度 = 8 字节 */
+
+    /* 1. 前 4 字节：目标位置 (0x607A) */
+    frame.data[0] = (uint8_t)(target_pos & 0xFF);
+    frame.data[1] = (uint8_t)((target_pos >> 8) & 0xFF);
+    frame.data[2] = (uint8_t)((target_pos >> 16) & 0xFF);
+    frame.data[3] = (uint8_t)((target_pos >> 24) & 0xFF);
+
+    /* 2. 后 4 字节：轮廓速度 (0x6081) */
+    frame.data[4] = (uint8_t)(profile_vel & 0xFF);
+    frame.data[5] = (uint8_t)((profile_vel >> 8) & 0xFF);
+    frame.data[6] = (uint8_t)((profile_vel >> 16) & 0xFF);
+    frame.data[7] = (uint8_t)((profile_vel >> 24) & 0xFF);
+
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
+
+/**
+ * @brief  配置 RxPDO1 映射为复合对象：控制字 (0x6040) + 轮廓速度 (0x6081)
+ * @details 对应 6 字节 RxPDO1 帧：前 2 字节控制字，后 4 字节轮廓速度
+ */
+CO_Err_t CIA402_MapRxPDO1_ControlwordAndProfileVel(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x200 + node->node_id; /* RxPDO1 默认 COB-ID 基址 0x200 */
+
+    /* 1. 禁用 RxPDO1 (通信参数 0x1400 sub 01，Bit31 置 1) */
+    err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+
+    /* 2. 清空当前映射表 (0x1600 sub 00 = 0) */
+    err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x00);
+    if (err != CO_OK) return err;
+
+    /* 3. 写入第 1 个映射对象：0x6040 (控制字，16位 = 0x10) -> 0x60400010U */
+    err = CANopen_SDO_Write32(node, 0x1600, 0x01, 0x60400010U);
+    if (err != CO_OK) return err;
+
+    /* 4. 写入第 2 个映射对象：0x6081 (轮廓速度，32位 = 0x20) -> 0x60810020U */
+    err = CANopen_SDO_Write32(node, 0x1600, 0x02, 0x60810020U);
+    if (err != CO_OK) return err;
+
+    /* 5. 设置映射个数为 2 (0x1600 sub 00 = 2) */
+    err = CANopen_SDO_Write8(node, 0x1600, 0x00, 0x02);
+    if (err != CO_OK) return err;
+
+    /* 6. 重新使能 RxPDO1 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1400, 0x01, cob_id);
+    if (err != CO_OK) return err;
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO1 一次性下发控制字与轮廓速度 (6 字节)
+ */
+CO_Err_t CANopen_SendRxPDO1_ControlwordAndProfileVel(CIA402_Node_t *node, uint16_t ctrl_word, uint32_t profile_vel)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x200 + node->node_id; /* RxPDO1 COB-ID: 0x200 + Node_ID */
+    frame.data_len = 6;                   /* 前2字节控制字 + 后4字节速度 = 6 字节 */
+
+    /* 1. 前 2 字节：控制字 (0x6040) */
+    frame.data[0] = (uint8_t)(ctrl_word & 0xFF);
+    frame.data[1] = (uint8_t)((ctrl_word >> 8) & 0xFF);
+
+    /* 2. 后 4 字节：轮廓速度 (0x6081) */
+    frame.data[2] = (uint8_t)(profile_vel & 0xFF);
+    frame.data[3] = (uint8_t)((profile_vel >> 8) & 0xFF);
+    frame.data[4] = (uint8_t)((profile_vel >> 16) & 0xFF);
+    frame.data[5] = (uint8_t)((profile_vel >> 24) & 0xFF);
+
+    node->control_word = ctrl_word;
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
+
+/**
  * @brief  配置 TxPDO1 仅映射状态字 (0x6041, 16位)
  * @details TxPDO1 通信参数索引为 0x1800，其映射参数索引为 0x1A00。
  *          状态字 0x6041 长度为 16 位 (0x10)，组合映射值为 0x60410010U。
@@ -784,27 +919,27 @@ CO_Err_t CIA402_MapTxPDO1_OnlyStatusword(CIA402_Node_t *node)
     /* 1. 禁用 TxPDO1 (向通信参数 0x1800 sub 01 写入 Bit31 置 1 的 COB-ID) */
     err = CANopen_SDO_Write32(node, 0x1800, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 	
     /* 2. 将 TxPDO1 映射参数 0x1A00 sub 00 设置为 0 (清空当前映射表) */
     err = CANopen_SDO_Write8(node, 0x1A00, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入唯一的映射对象：0x6041 (状态字，16位 = 0x10) -> 组合格式: 0x60410010U */
     err = CANopen_SDO_Write32(node, 0x1A00, 0x01, 0x60410010U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 将映射参数 0x1A00 sub 00 设置为 1 (声明当前 TxPDO1 仅包含 1 个映射对象) */
     err = CANopen_SDO_Write8(node, 0x1A00, 0x00, 0x01);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 5. 重新使能 TxPDO1 (写入正常的 COB-ID，Bit 31 清 0) */
     err = CANopen_SDO_Write32(node, 0x1800, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }
@@ -824,32 +959,32 @@ CO_Err_t CIA402_MapTxPDO1_StatuswordAndActualPos(CIA402_Node_t *node)
     /* 1. 禁用 TxPDO1 (向通信参数 0x1800 sub 01 写入 Bit31 置 1 的 COB-ID) */
     err = CANopen_SDO_Write32(node, 0x1800, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 2. 将 TxPDO1 映射参数 0x1A00 sub 00 设置为 0 (清空当前映射表) */
     err = CANopen_SDO_Write8(node, 0x1A00, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入第 1 个映射对象：0x6041 (状态字，16位 = 0x10) -> 0x60410010U */
     err = CANopen_SDO_Write32(node, 0x1A00, 0x01, 0x60410010U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 写入第 2 个映射对象：0x6064 (实际位置，32位 = 0x20) -> 0x60640020U */
     err = CANopen_SDO_Write32(node, 0x1A00, 0x02, 0x60640020U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 5. 将映射参数 0x1A00 sub 00 设置为 2 (声明当前 TxPDO1 包含 2 个映射对象) */
     err = CANopen_SDO_Write8(node, 0x1A00, 0x00, 0x02);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 6. 重新使能 TxPDO1 (写入正常的 COB-ID，Bit 31 清 0) */
     err = CANopen_SDO_Write32(node, 0x1800, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }
@@ -864,27 +999,27 @@ CO_Err_t CIA402_MapRxPDO2_OnlyMode(CIA402_Node_t *node)
     /* 1. 禁用 RxPDO2 (0x1401 sub 01) */
     err = CANopen_SDO_Write32(node, 0x1401, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 2. 清空映射表 (0x1601 sub 00 = 0) */
     err = CANopen_SDO_Write8(node, 0x1601, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入 0x6060 (8位 = 0x08) -> 0x60600008U */
     err = CANopen_SDO_Write32(node, 0x1601, 0x01, 0x60600008U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 设置映射个数为 1 */
     err = CANopen_SDO_Write8(node, 0x1601, 0x00, 0x01);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 5. 重新使能 RxPDO2 */
     err = CANopen_SDO_Write32(node, 0x1401, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }
@@ -896,6 +1031,138 @@ CO_Err_t CANopen_SendRxPDO2_OnlyMode(CIA402_Node_t *node, uint8_t mode)
     frame.cob_id = 0x300 + node->node_id;
     frame.data_len = 1;
     frame.data[0] = mode;
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
+
+/**
+ * @brief  配置 RxPDO2 映射为复合对象：轮廓加速度 (0x6083) + 轮廓减速度 (0x6084)
+ * @details RxPDO2 通信参数索引为 0x1401，映射参数索引为 0x1601，默认 COB-ID 为 0x300 + Node_ID。
+ *          前 4 字节轮廓加速度，后 4 字节轮廓减速度。
+ */
+CO_Err_t CIA402_MapRxPDO2_ProfileAccelAndDecel(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x300 + node->node_id; /* RxPDO2 默认 COB-ID 基址 0x300 */
+
+    /* 1. 禁用 RxPDO2 (向通信参数 0x1401 sub 01 写入 Bit31 置 1 的 COB-ID) */
+    err = CANopen_SDO_Write32(node, 0x1401, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+	
+
+    /* 2. 将 RxPDO2 映射参数 0x1601 sub 00 设置为 0 (清空当前映射表) */
+    err = CANopen_SDO_Write8(node, 0x1601, 0x00, 0x00);
+    if (err != CO_OK) return err;
+	
+
+    /* 3. 写入第 1 个映射对象：0x6083 (轮廓加速度，32位 = 0x20) -> 0x60830020U */
+    err = CANopen_SDO_Write32(node, 0x1601, 0x01, 0x60830020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 4. 写入第 2 个映射对象：0x6084 (轮廓减速度，32位 = 0x20) -> 0x60840020U */
+    err = CANopen_SDO_Write32(node, 0x1601, 0x02, 0x60840020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 5. 将映射参数 0x1601 sub 00 设置为 2 (声明当前 RxPDO2 包含 2 个映射对象) */
+    err = CANopen_SDO_Write8(node, 0x1601, 0x00, 0x02);
+    if (err != CO_OK) return err;
+	
+
+    /* 6. 重新使能 RxPDO2 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1401, 0x01, cob_id);
+    if (err != CO_OK) return err;
+	
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO2 一次性下发轮廓加速度与轮廓减速度 (8 字节)
+ */
+CO_Err_t CANopen_SendRxPDO2_ProfileAccelAndDecel(CIA402_Node_t *node, uint32_t profile_acc, uint32_t profile_dec)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x300 + node->node_id; /* RxPDO2 COB-ID: 0x300 + Node_ID */
+    frame.data_len = 8;                   /* 前4字节加速度 + 后4字节减速度 = 8 字节 */
+
+    /* 1. 前 4 字节：轮廓加速度 (0x6083) */
+    frame.data[0] = (uint8_t)(profile_acc & 0xFF);
+    frame.data[1] = (uint8_t)((profile_acc >> 8) & 0xFF);
+    frame.data[2] = (uint8_t)((profile_acc >> 16) & 0xFF);
+    frame.data[3] = (uint8_t)((profile_acc >> 24) & 0xFF);
+
+    /* 2. 后 4 字节：轮廓减速度 (0x6084) */
+    frame.data[4] = (uint8_t)(profile_dec & 0xFF);
+    frame.data[5] = (uint8_t)((profile_dec >> 8) & 0xFF);
+    frame.data[6] = (uint8_t)((profile_dec >> 16) & 0xFF);
+    frame.data[7] = (uint8_t)((profile_dec >> 24) & 0xFF);
+
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
+
+/**
+ * @brief  配置 RxPDO2 仅映射轮廓速度 (0x6081, 32位)
+ * @details RxPDO2 通信参数索引为 0x1401，映射参数索引为 0x1601。
+ *          默认 COB-ID 为 0x300 + Node_ID。轮廓速度长度为 32 位 (0x20)，组合映射值为 0x60810020U。
+ */
+CO_Err_t CIA402_MapRxPDO2_OnlyProfileVel(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x300 + node->node_id; /* RxPDO2 默认 COB-ID 基址 0x300 */
+
+    /* 1. 禁用 RxPDO2 (向通信参数 0x1401 sub 01 写入 Bit31 置 1 的 COB-ID) */
+    err = CANopen_SDO_Write32(node, 0x1401, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+	
+
+    /* 2. 将 RxPDO2 映射参数 0x1601 sub 00 设置为 0 (清空当前映射表) */
+    err = CANopen_SDO_Write8(node, 0x1601, 0x00, 0x00);
+    if (err != CO_OK) return err;
+	
+
+    /* 3. 写入唯一的映射对象：0x6081 (轮廓速度，32位 = 0x20) -> 组合格式: 0x60810020U */
+    err = CANopen_SDO_Write32(node, 0x1601, 0x01, 0x60810020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 4. 将映射参数 0x1601 sub 00 设置为 1 (声明当前 RxPDO2 仅包含 1 个映射对象) */
+    err = CANopen_SDO_Write8(node, 0x1601, 0x00, 0x01);
+    if (err != CO_OK) return err;
+	
+
+    /* 5. 重新使能 RxPDO2 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1401, 0x01, cob_id);
+    if (err != CO_OK) return err;
+	
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO2 下发轮廓速度 (4 字节)
+ * @details RxPDO2 默认 COB-ID 为 0x300 + Node_ID，数据长度为 4 字节。
+ */
+CO_Err_t CANopen_SendRxPDO2_OnlyProfileVel(CIA402_Node_t *node, uint32_t profile_vel)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x300 + node->node_id; /* RxPDO2 COB-ID: 0x300 + Node_ID */
+    frame.data_len = 4;                   /* 仅包含 4 字节的轮廓速度 */
+
+    /* 写入 4 字节轮廓速度 (0x6081) */
+    frame.data[0] = (uint8_t)(profile_vel & 0xFF);
+    frame.data[1] = (uint8_t)((profile_vel >> 8) & 0xFF);
+    frame.data[2] = (uint8_t)((profile_vel >> 16) & 0xFF);
+    frame.data[3] = (uint8_t)((profile_vel >> 24) & 0xFF);
+
     return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
 }
 
@@ -914,27 +1181,27 @@ CO_Err_t CIA402_MapTxPDO2_OnlyActualPos(CIA402_Node_t *node)
     /* 1. 禁用 TxPDO2 (向通信参数 0x1801 sub 01 写入 Bit31 置 1 的 COB-ID) */
     err = CANopen_SDO_Write32(node, 0x1801, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 2. 将 TxPDO2 映射参数 0x1A01 sub 00 设置为 0 (清空当前映射表) */
     err = CANopen_SDO_Write8(node, 0x1A01, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入唯一的映射对象：0x6064 (实际位置，32位 = 0x20) -> 组合格式: 0x60640020U */
     err = CANopen_SDO_Write32(node, 0x1A01, 0x01, 0x60640020U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 将映射参数 0x1A01 sub 00 设置为 1 (声明当前 TxPDO2 仅包含 1 个映射对象) */
     err = CANopen_SDO_Write8(node, 0x1A01, 0x00, 0x01);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 5. 重新使能 TxPDO2 (写入正常的 COB-ID，Bit 31 清 0) */
     err = CANopen_SDO_Write32(node, 0x1801, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }
@@ -949,28 +1216,28 @@ CO_Err_t CIA402_MapRxPDO3_OnlyPos(CIA402_Node_t *node)
     /* 1. 禁用 RxPDO3 (0x1402 sub 01) */
     err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 2. 清空映射表 (0x1602 sub 00 = 0) */
     err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入 0x607A (32位 = 0x20) -> 0x607A0020U */
     err = CANopen_SDO_Write32(node, 0x1602, 0x01, 0x607A0020U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 设置映射个数为 1 */
     err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x01);
     if (err != CO_OK) return err;
 
-	delay_ms(6);
+	
 
     /* 5. 重新使能 RxPDO3 */
     err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }
@@ -987,6 +1254,200 @@ CO_Err_t CANopen_SendRxPDO3_OnlyPos(CIA402_Node_t *node, int32_t target_pos)
     return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
 }
 
+/**
+ * @brief  配置 RxPDO3 仅映射控制字 (0x6040, 16位)
+ * @details RxPDO3 通信参数索引为 0x1402，映射参数索引为 0x1602。
+ *          默认 COB-ID 为 0x400 + Node_ID。控制字长度为 16 位 (0x10)，组合映射值为 0x60400010U。
+ */
+CO_Err_t CIA402_MapRxPDO3_OnlyControlword(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x400 + node->node_id; /* RxPDO3 默认 COB-ID 基址 0x400 */
+
+    /* 1. 禁用 RxPDO3 (向通信参数 0x1402 sub 01 写入 Bit31 置 1 的 COB-ID) */
+    err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+	
+
+    /* 2. 将 RxPDO3 映射参数 0x1602 sub 00 设置为 0 (清空当前映射表) */
+    err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x00);
+    if (err != CO_OK) return err;
+	
+
+    /* 3. 写入唯一的映射对象：0x6040 (控制字，16位 = 0x10) -> 组合格式: 0x60400010U */
+    err = CANopen_SDO_Write32(node, 0x1602, 0x01, 0x60400010U);
+    if (err != CO_OK) return err;
+	
+
+    /* 4. 将映射参数 0x1602 sub 00 设置为 1 (声明当前 RxPDO3 仅包含 1 个映射对象) */
+    err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x01);
+    if (err != CO_OK) return err;
+	
+
+    /* 5. 重新使能 RxPDO3 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id);
+    if (err != CO_OK) return err;
+	
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO3 下发控制字 (2 字节)
+ * @details RxPDO3 默认 COB-ID 为 0x400 + Node_ID，数据长度为 2 字节。
+ */
+CO_Err_t CANopen_SendRxPDO3_OnlyControlword(CIA402_Node_t *node, uint16_t ctrl_word)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x400 + node->node_id; /* RxPDO3 COB-ID: 0x400 + Node_ID */
+    frame.data_len = 2;                   /* 仅包含 2 字节的控制字 */
+
+    /* 写入 2 字节控制字 (0x6040) */
+    frame.data[0] = (uint8_t)(ctrl_word & 0xFF);
+    frame.data[1] = (uint8_t)((ctrl_word >> 8) & 0xFF);
+
+    /* 同步更新节点结构体中的控制字记录 */
+    node->control_word = ctrl_word;
+    
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
+
+/**
+ * @brief  配置 RxPDO3 仅映射目标位置 (0x607A, 32位)
+ * @details RxPDO3 通信参数索引为 0x1402，映射参数索引为 0x1602。
+ *          默认 COB-ID 为 0x400 + Node_ID。目标位置长度为 32 位 (0x20)，组合映射值为 0x607A0020U。
+ */
+CO_Err_t CIA402_MapRxPDO3_OnlyTargetPos(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x400 + node->node_id; /* RxPDO3 默认 COB-ID 基址 0x400 */
+
+    /* 1. 禁用 RxPDO3 (向通信参数 0x1402 sub 01 写入 Bit31 置 1 的 COB-ID) */
+    err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+	
+
+    /* 2. 将 RxPDO3 映射参数 0x1602 sub 00 设置为 0 (清空当前映射表) */
+    err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x00);
+    if (err != CO_OK) return err;
+	
+
+    /* 3. 写入唯一的映射对象：0x607A (目标位置，32位 = 0x20) -> 组合格式: 0x607A0020U */
+    err = CANopen_SDO_Write32(node, 0x1602, 0x01, 0x607A0020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 4. 将映射参数 0x1602 sub 00 设置为 1 (声明当前 RxPDO3 仅包含 1 个映射对象) */
+    err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x01);
+    if (err != CO_OK) return err;
+	
+
+    /* 5. 重新使能 RxPDO3 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id);
+    if (err != CO_OK) return err;
+	
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO3 下发目标位置 (4 字节)
+ * @details RxPDO3 默认 COB-ID 为 0x400 + Node_ID，数据长度为 4 字节。
+ */
+CO_Err_t CANopen_SendRxPDO3_OnlyTargetPos(CIA402_Node_t *node, int32_t target_pos)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x400 + node->node_id; /* RxPDO3 COB-ID: 0x400 + Node_ID */
+    frame.data_len = 4;                   /* 仅包含 4 字节的目标位置 */
+
+    /* 写入 4 字节目标位置 (0x607A) */
+    frame.data[0] = (uint8_t)(target_pos & 0xFF);
+    frame.data[1] = (uint8_t)((target_pos >> 8) & 0xFF);
+    frame.data[2] = (uint8_t)((target_pos >> 16) & 0xFF);
+    frame.data[3] = (uint8_t)((target_pos >> 24) & 0xFF);
+
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
+
+/**
+ * @brief  配置 RxPDO3 映射为复合对象：轮廓加速度 (0x6083) + 轮廓减速度 (0x6084)
+ * @details RxPDO3 通信参数索引为 0x1402，映射参数索引为 0x1602，默认 COB-ID 为 0x400 + node_id。
+ *          前 4 字节轮廓加速度，后 4 字节轮廓减速度。
+ */
+CO_Err_t CIA402_MapRxPDO3_ProfileAccelAndDecel(CIA402_Node_t *node)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CO_Err_t err;
+    uint32_t cob_id = 0x400 + node->node_id; /* RxPDO3 默认 COB-ID 基址 0x400 */
+
+    /* 1. 禁用 RxPDO3 (向通信参数 0x1402 sub 01 写入 Bit31 置 1 的 COB-ID) */
+    err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id | 0x80000000U);
+    if (err != CO_OK) return err;
+	
+
+    /* 2. 将 RxPDO3 映射参数 0x1602 sub 00 设置为 0 (清空当前映射表) */
+    err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x00);
+    if (err != CO_OK) return err;
+	
+
+    /* 3. 写入第 1 个映射对象：0x6083 (轮廓加速度，32位 = 0x20) -> 0x60830020U */
+    err = CANopen_SDO_Write32(node, 0x1602, 0x01, 0x60830020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 4. 写入第 2 个映射对象：0x6084 (轮廓减速度，32位 = 0x20) -> 0x60840020U */
+    err = CANopen_SDO_Write32(node, 0x1602, 0x02, 0x60840020U);
+    if (err != CO_OK) return err;
+	
+
+    /* 5. 将映射参数 0x1602 sub 00 设置为 2 (声明当前 RxPDO3 包含 2 个映射对象) */
+    err = CANopen_SDO_Write8(node, 0x1602, 0x00, 0x02);
+    if (err != CO_OK) return err;
+	
+
+    /* 6. 重新使能 RxPDO3 (写入正常的 COB-ID，Bit 31 清 0) */
+    err = CANopen_SDO_Write32(node, 0x1402, 0x01, cob_id);
+    if (err != CO_OK) return err;
+	
+
+    return CO_OK;
+}
+
+/**
+ * @brief  通过 RxPDO3 一次性下发轮廓加速度与轮廓减速度 (8 字节)
+ */
+CO_Err_t CANopen_SendRxPDO3_ProfileAccelAndDecel(CIA402_Node_t *node, uint32_t profile_acc, uint32_t profile_dec)
+{
+    if (!node) return CO_ERROR_PARAM;
+
+    CanFrame_t frame;
+    frame.cob_id = 0x400 + node->node_id; /* RxPDO3 COB-ID: 0x400 + Node_ID */
+    frame.data_len = 8;                   /* 前4字节加速度 + 后4字节减速度 = 8 字节 */
+
+    /* 1. 前 4 字节：轮廓加速度 (0x6083) */
+    frame.data[0] = (uint8_t)(profile_acc & 0xFF);
+    frame.data[1] = (uint8_t)((profile_acc >> 8) & 0xFF);
+    frame.data[2] = (uint8_t)((profile_acc >> 16) & 0xFF);
+    frame.data[3] = (uint8_t)((profile_acc >> 24) & 0xFF);
+
+    /* 2. 后 4 字节：轮廓减速度 (0x6084) */
+    frame.data[4] = (uint8_t)(profile_dec & 0xFF);
+    frame.data[5] = (uint8_t)((profile_dec >> 8) & 0xFF);
+    frame.data[6] = (uint8_t)((profile_dec >> 16) & 0xFF);
+    frame.data[7] = (uint8_t)((profile_dec >> 24) & 0xFF);
+
+    return CAN_SendFrame(&frame) ? CO_OK : CO_ERROR_HW;
+}
+
 /************************ RxPDO4: 映射目标速度 (0x60FF) ************************/
 CO_Err_t CIA402_MapRxPDO4_OnlyVel(CIA402_Node_t *node)
 {
@@ -997,27 +1458,27 @@ CO_Err_t CIA402_MapRxPDO4_OnlyVel(CIA402_Node_t *node)
     /* 1. 禁用 RxPDO4 (0x1403 sub 01) */
     err = CANopen_SDO_Write32(node, 0x1403, 0x01, cob_id | 0x80000000U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 2. 清空映射表 (0x1603 sub 00 = 0) */
     err = CANopen_SDO_Write8(node, 0x1603, 0x00, 0x00);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 3. 写入 0x60FF (32位 = 0x20) -> 0x60FF0020U */
     err = CANopen_SDO_Write32(node, 0x1603, 0x01, 0x60FF0020U);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 4. 设置映射个数为 1 */
     err = CANopen_SDO_Write8(node, 0x1603, 0x00, 0x01);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     /* 5. 重新使能 RxPDO4 */
     err = CANopen_SDO_Write32(node, 0x1403, 0x01, cob_id);
     if (err != CO_OK) return err;
-	delay_ms(6);
+	
 
     return CO_OK;
 }

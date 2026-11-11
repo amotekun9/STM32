@@ -22,15 +22,18 @@ extern "C" {
 /************************* 上报结构体（MCU → 触摸屏，xxx_up）*************************/
 typedef struct
 {
-    uint16_t encoder_angle_up;      // modbus_holding_reg[0]：主轴当前角度
-    uint16_t weft_density_up;         // modbus_holding_reg[1]：纬密
-    uint16_t left_edge_pos_up;      // modbus_holding_reg[2]：左侧电子绞边位置
-    uint16_t right_edge_pos_up;     // modbus_holding_reg[3]：右侧电子绞边位置
-    uint16_t cut_star_angle_up;       // modbus_holding_reg[4]：自动剪切时间间隔
-    uint16_t cut_return_angle_up;       // modbus_holding_reg[5]：自动剪切时间间隔
-    uint16_t encoder_rpm_up;      // modbus_holding_reg[7]：主轴当前速度
+    uint16_t encoder_angle_up;      // 主轴当前角度
+    uint16_t weft_density_up;         //纬密
+    uint16_t left_edge_pos_up;      // 左侧电子绞边位置
+    uint16_t right_edge_pos_up;     // 右侧电子绞边位置
+    uint16_t cut_star_angle_up;       // 自动剪切时间间隔
+    uint16_t cut_return_angle_up;       // 自动剪切时间间隔
+    uint16_t encoder_rpm_up;      // 主轴当前速度
+    uint16_t left_edge_angle_up;      // 左侧电子绞边位置
+    uint16_t right_edge_angle_up;     // 右侧电子绞边位置
 
 } UploadData_t;
+
 
 /************************* 控制指令bit定义（触摸屏 → MCU）*************************/
 #define CTRL_LEFT_EDGE_JOG_FWD  1   // bit0：左侧绞边慢动正转

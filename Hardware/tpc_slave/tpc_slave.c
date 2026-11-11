@@ -35,6 +35,8 @@ extern volatile uint8_t g_left_edge_jog_fwd_flag;
 extern volatile uint8_t g_right_edge_fwd_flag;
 extern volatile uint8_t g_left_edge_jog_rev_flag;
 extern volatile uint8_t g_right_edge_rev_flag;
+int32_t send_pulse;  // 下发给驱动器的脉冲（带方向符号）
+int32_t pulse_int;
 
 // Modbus CRC16 查表
 static const uint16_t crc16_table[] = {
@@ -213,20 +215,37 @@ void modbus_slave_init(void)
  */
 void ModbusHolding_RefreshUpload(void)
 {
-    // ========== 第一步：优先读取触摸屏下发的参数、控制命令（最重要！先读后写，防止屏下发的值被覆盖） ==========
-    g_upload_data.weft_density_up      = modbus_holding_reg[1];       // 纬密，触摸屏可修改参数
-    g_upload_data.cut_star_angle_up   = modbus_holding_reg[4];      // 剪刀起始剪切角度，触摸屏可修改参数
-    g_upload_data.cut_return_angle_up= modbus_holding_reg[5];       // 剪刀回位角度，触摸屏可修改参数
-    g_ctrl_cmd_reg = modbus_holding_reg[6];                         // 控制命令寄存器，仅读取，单片机不回写
+	// ========== 第一步：优先读取触摸屏下发的参数、控制命令（最重要！先读后写，防止屏下发的值被覆盖） ==========
+	g_upload_data.weft_density_up	   = modbus_holding_reg[1]; 	  // 纬密，触摸屏可修改参数
+	g_upload_data.cut_star_angle_up   = modbus_holding_reg[4];		// 剪刀起始剪切角度，触摸屏可修改参数
+	g_upload_data.cut_return_angle_up= modbus_holding_reg[5];		// 剪刀回位角度，触摸屏可修改参数
+	g_ctrl_cmd_reg = modbus_holding_reg[6]; 						// 控制命令寄存器，仅读取，单片机不回写
+	g_upload_data.left_edge_angle_up = modbus_holding_reg[8];	   // 左侧电子绞边定时角度，触摸屏可修改参数
+	g_upload_data.right_edge_angle_up = modbus_holding_reg[9];	   // 右侧电子绞边定时角度，触摸屏可修改参数
 
-    // ========== 第二步：本地采集变量/参数 刷新到Modbus保持寄存器，用于触摸屏读取上报和参数回显 ==========
-    modbus_holding_reg[0] = g_upload_data.encoder_angle_up;         // 主轴编码器角度，采集上报，只读
-    modbus_holding_reg[1] = g_upload_data.weft_density_up;             // 纬密，参数回显
-    modbus_holding_reg[2] = g_upload_data.left_edge_pos_up;          // 左绞边位置，采集上报，只读
-    modbus_holding_reg[3] = g_upload_data.right_edge_pos_up;        // 右绞边位置，采集上报，只读
-    modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;        // 剪刀起始剪切角度，参数回显
-    modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;      // 剪刀回位角度，参数回显
-    modbus_holding_reg[7] = g_upload_data.encoder_rpm_up;           // 主轴实时转速，采集上报，只读 
+	// ========== 第二步：本地采集变量/参数 刷新到Modbus保持寄存器，用于触摸屏读取上报和参数回显 ==========
+	modbus_holding_reg[0] = g_upload_data.encoder_angle_up; 		// 主轴编码器角度，采集上报，只读
+	modbus_holding_reg[1] = g_upload_data.weft_density_up;			   // 纬密，参数回显
+	modbus_holding_reg[2] = g_upload_data.left_edge_pos_up; 		 // 左绞边位置，采集上报，只读
+	modbus_holding_reg[3] = g_upload_data.right_edge_pos_up;		// 右绞边位置，采集上报，只读
+	modbus_holding_reg[4] = g_upload_data.cut_star_angle_up;		// 剪刀起始剪切角度，参数回显
+	modbus_holding_reg[5] = g_upload_data.cut_return_angle_up;		// 剪刀回位角度，参数回显
+	modbus_holding_reg[7] = g_upload_data.encoder_rpm_up;			// 主轴实时转速，采集上报，只读 
+	modbus_holding_reg[8] = g_upload_data.left_edge_angle_up;	   // 左侧电子绞边定时角度，参数回显
+	modbus_holding_reg[9] = g_upload_data.right_edge_angle_up;	   // 右侧电子绞边定时角度，参数回显
+	
+	uint32_t p_scaled;    // 放大100倍后的单纬脉冲值
+	uint32_t pulse_rem;   // 本次余数
+	 p_scaled = COEFF_VAL / g_upload_data.weft_density_up;
+	pulse_int = p_scaled / SCALE;  // 取出整数部分脉冲
+	pulse_rem = p_scaled % SCALE;  // 取出余数部分
+
+	g_jog_err_acc += pulse_rem;    // 余数存入误差累加器
+	if(g_jog_err_acc >= SCALE)     // 余数累计达到阈值，补偿1脉冲
+	{
+		pulse_int += 1;
+		g_jog_err_acc -= SCALE;
+	}
 }
 
 /**
@@ -255,7 +274,7 @@ void Clamp_Jog_SingleStep(CAN_Step_Node_t *node, int8_t dir)
     if(g_drv_mode != DRV_MODE_PV)
     {   
         CANOPEN_Motor_SetPVMode(node);
-        delay_ms(5);
+//        delay_ms(5);
         CANOPEN_Motor_Ready(node);
         g_drv_mode = DRV_MODE_PV;
     }
@@ -275,7 +294,7 @@ void Clamp_Jog_SingleStep(CAN_Step_Node_t *node, int8_t dir)
     send_pulse = (int32_t)pulse_int * dir;
     
     CANOPEN_Motor_SetVelocity(node, send_pulse);
-    delay_ms(5);
+//    delay_ms(5);
     CANOPEN_Motor_Enable(node);
 }
 
@@ -297,41 +316,29 @@ void Modbus_CmdParse(void)
     // ========== 左侧电子绞边 ==========
     if(cmd == CTRL_LEFT_EDGE_JOG_FWD)
     {
-        selvage_sdo_jog(&g_servo_node_1,800);
+        selvage_sdo_jog(&g_servo_node_1,32);
     }
     if(cmd == CTRL_LEFT_EDGE_JOG_REV)
     {
-        selvage_sdo_jog(&g_servo_node_1,-800);
+        selvage_sdo_jog(&g_servo_node_1,-32);
     }
     if(cmd == CTRL_LEFT_EDGE_HOME)//归零
     {
     	g_servo_node_1.zero_offset = g_servo_node_1.actual_pos;
-//    	g_servo_node_1.zero_offset = abs((g_servo_node_1.actual_pos%36000)/100);
-//    	g_servo_node_1.zero_offset = g_servo_node_1.actual_pos;
-//		CANopen_SDO_Write32(&g_servo_node_1,0x607c,0,-g_servo_node_1.actual_pos);
-//		delay_ms(6);
-//		CANopen_SDO_Write16(&g_servo_node_1,0x2110,0,1);
     }
 
     // ========== 右侧电子绞边 ==========
     if(cmd == CTRL_RIGHT_EDGE_JOG_FWD)
     {
-        selvage_sdo_jog(&g_servo_node_2,800);
+        selvage_sdo_jog(&g_servo_node_2,32);
     }
     if(cmd == CTRL_RIGHT_EDGE_JOG_REV)
     {
-        selvage_sdo_jog(&g_servo_node_2,-800);
+        selvage_sdo_jog(&g_servo_node_2,-32);
     }
     if(cmd == CTRL_RIGHT_EDGE_HOME) //归零
     {
     	g_servo_node_2.zero_offset = g_servo_node_2.actual_pos;
-//    	g_servo_node_2.zero_offset = abs((g_servo_node_2.actual_pos%36000)/100);
-//	    g_servo_node_2.zero_offset = g_servo_node_2.actual_pos;
-//		CANopen_SDO_Write16(&g_servo_node_2,0x2110,0,271);
-//		delay_ms(6);
-//		CANopen_SDO_Write16(&g_servo_node_2,0x2110,0,1);
-//		CANopen_SDO_Write32(&g_servo_node_2,0x607c,0,-g_servo_node_2.actual_pos);
-//		delay_ms(6);
     }
 
     // ========== 电子剪刀 ==========
@@ -367,7 +374,21 @@ void Modbus_CmdParse(void)
     // ========== 屏幕参数保存 ==========
     if(cmd == CTRL_PARAM_SAVE)
     {
-        upload_param_save();
+		uint32_t p_scaled;    // 放大100倍后的单纬脉冲值
+		uint32_t pulse_rem;   // 本次余数
+		upload_param_save();
+	
+		 p_scaled = COEFF_VAL / g_upload_data.weft_density_up;
+		pulse_int = p_scaled / SCALE;  // 取出整数部分脉冲
+		pulse_rem = p_scaled % SCALE;  // 取出余数部分
+
+		g_jog_err_acc += pulse_rem;    // 余数存入误差累加器
+		if(g_jog_err_acc >= SCALE)     // 余数累计达到阈值，补偿1脉冲
+		{
+				pulse_int += 1;
+				g_jog_err_acc -= SCALE;
+		}
+
         cmd &= ~(1U << CTRL_PARAM_SAVE); // 清除保存标志位
     }
 

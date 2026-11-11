@@ -11,10 +11,13 @@ extern uint16_t modbus_holding_reg[];
  */
 typedef struct
 {
-    uint16_t weft_density_up;        // 纬密
-    uint16_t cut_star_angle_up;      // 剪刀启动角度
-    uint16_t cut_return_angle_up;    // 剪刀回位角度
+	uint16_t weft_density_up;		 // 纬密
+	uint16_t cut_star_angle_up; 	 // 剪刀启动角度
+	uint16_t cut_return_angle_up;	 // 剪刀回位角度
+	uint16_t left_edge_angle_up;	  // 左侧电子绞边定时角度
+	uint16_t right_edge_angle_up;	  // 右侧电子绞边定时角度
 } SaveParam_t;
+
 
 #define PARAM_STORE_ADDR     0x0807F800U  // Flash参数存储地址
 

@@ -18,6 +18,7 @@ void scissor_close_trig(uint16_t ms);
 void scissor_poll(void);
 uint8_t scissor_is_idle(void);
 void scissor_window_check(const uint16_t pulse_us, const uint8_t offset_encoder_cnt);
+void scissor_window_advance_check(const uint16_t pulse_us, const uint8_t offset_encoder_cnt);
 
 
 #ifdef __cplusplus

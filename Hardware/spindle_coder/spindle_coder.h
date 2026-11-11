@@ -20,7 +20,7 @@
 #define CODER_FILTER_K     4        // 编码器速度一阶滤波系数，数值越大滤波越强、响应越慢
 #define ENC_PULSE_PER_ROUND 360     // 编码器单圈原始脉冲数（四倍频前）
 #define RPM_SWITCH_THRESHOLD  50      // 切换阈值 50rpm
-#define CODER_SAMPLE_MS     1U    // 编码器采样周期1ms
+#define CODER_SAMPLE_MS     1    // 编码器采样周期1ms
 #define ENC_SINGLE_PER_ROUND 1440
 
 
@@ -45,9 +45,10 @@ extern uint16_t tim6_sample_ms;
 
 void Coder_Init(void);              // 编码器初始化，启动TIM编码器、TIM6定时采样
 void Coder_Reset(void);             // 编码器手动清零，重置位置、角度、速度
-void Coder_Callback(void);          // TIM6定时采样回调，计算脉冲、转速、角度
+int16_t Coder_Callback(void);          // TIM6定时采样回调，计算脉冲、转速、角度
 void Coder_Z_Phase_Callback(void);   // Z相中断处理函数，仅置标记，不在中断内清零
 void TIM6_SetSampleMs(uint16_t ms);
+void Z_pulse_Output(void);
 
 #endif
 
